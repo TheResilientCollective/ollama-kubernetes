@@ -1,0 +1,27 @@
+{{- if .Values.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+    name: ollama-{{ .Release.Name }}
+    namespace: "{{ .Release.Namespace }}"
+    labels:
+        app: ollama
+        tier: "{{ .Values.tier }}"
+spec:
+    maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+    metrics:
+        - resource:
+              name: cpu
+              target:
+                  averageUtilization: {{ .Values.autoscaling.targetCPUUtilization }}
+                  type: Utilization
+          type: Resource
+    minReplicas: {{ .Values.autoscaling.minReplicas }}
+    scaleTargetRef:
+        apiVersion: apps/v1
+        kind: Deployment
+        name: ollama-{{ .Release.Name }}
+    behavior:
+        scaleDown:
+            stabilizationWindowSeconds: 300
+{{- end}}

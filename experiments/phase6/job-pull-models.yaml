@@ -1,0 +1,40 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+    name: pull-qwen25-coder-3b
+    namespace: ollama-phase6
+spec:
+    backoffLimit: 2
+    activeDeadlineSeconds: 1500
+    ttlSecondsAfterFinished: 86400
+    template:
+        spec:
+            restartPolicy: OnFailure
+            containers:
+                - name: pull
+                  image: ollama/ollama:latest
+                  env:
+                      - name: OLLAMA_MODELS
+                        value: /models
+                      - name: MODELS
+                        value: qwen2.5-coder:3b llama3.2:1b
+                  command:
+                      - /bin/sh
+                      - -c
+                      - |
+                          set -eu
+                          flock /models/.pull.lock -c "
+                              ollama serve & SERVE_PID=\$!; sleep 10;
+                              for M in $MODELS; do
+                                  ollama pull \$M;
+                                  ollama list | grep -F -q \$M;
+                              done;
+                              kill \$SERVE_PID; wait \$SERVE_PID 2>/dev/null || true
+                          "
+                  volumeMounts:
+                      - name: models
+                        mountPath: /models
+            volumes:
+                - name: models
+                  persistentVolumeClaim:
+                      claimName: ollama-models
