@@ -20,32 +20,6 @@ spec:
                 app: ollama
                 model: qwen2.5-coder__3b
         spec:
-            initContainers:
-                - name: pull-model
-                  image: ollama/ollama:latest
-                  command:
-                      - /bin/sh
-                      - -c
-                      - |
-                          set -eu
-
-                          echo "Starting ollama..."
-                          ollama serve & SERVE_PID=$!
-                          sleep 10
-
-                          echo "Pulling model..."
-                          ollama pull qwen2.5-coder:3b
-                          echo "Model pulled successfully"
-
-                          kill $SERVE_PID
-                          wait $SERVE_PID 2>/dev/null || true
-
-                  volumeMounts:
-                      - name: models
-                        mountPath: /models
-                  env:
-                      - name: OLLAMA_MODELS
-                        value: /models
             containers:
                 - name: ollama
                   image: ollama/ollama:latest
@@ -95,4 +69,5 @@ spec:
                       failureThreshold: 30
             volumes:
                 - name: models
-                  emptyDir: {}
+                  persistentVolumeClaim:
+                      claimName: ollama-models
