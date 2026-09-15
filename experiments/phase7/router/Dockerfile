@@ -1,8 +1,22 @@
-FROM node:22-alpine
+
+##### BUILD #####
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-COPY index.js .
+COPY package.json tsconfig.json ./
+RUN npm install
+
+COPY src/ ./src/
+RUN npm run build
+
+
+##### RUN #####
+FROM node:22-alpine AS runner
+
+WORKDIR /app
+
+COPY --from=builder /app/dist/ ./
 
 EXPOSE 11434
 
