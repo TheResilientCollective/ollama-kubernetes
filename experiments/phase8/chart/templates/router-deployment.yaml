@@ -32,5 +32,21 @@ spec:
                   envFrom:
                       - configMapRef:
                           name: ollama-router-config
+                  readinessProbe:
+                      httpGet:
+                          path: /api/tags
+                          port: 11434
+                      initialDelaySeconds: 10
+                      periodSeconds: 10
+                      timeoutSeconds: 2
+                      failureThreshold: 3
+                  livenessProbe:
+                      httpGet:
+                          path: /api/gateway/status
+                          port: 11434
+                      initialDelaySeconds: 5
+                      periodSeconds: 5
+                      timeoutSeconds: 2
+                      failureThreshold: 3
 
 {{- end }}
