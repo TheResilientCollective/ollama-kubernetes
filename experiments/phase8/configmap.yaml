@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: ollama-config
+data:
+    OLLAMA_KEEP_ALIVE: "5m"
+    OLLAMA_HOST: "0.0.0.0"
+    TARGET_SMALL_ENDPOINT: http://ollama-small:11434
+    TARGET_MEDIUM_ENDPOINT: http://ollama-medium:11434
+    TARGET_LARGE_ENDPOINT: http://ollama-large:11434
+    TARGET_SMALL_SIZE: "3Gi"
+    TARGET_MEDIUM_SIZE: "4Gi"
+    TARGET_LARGE_SIZE: "12Gi"

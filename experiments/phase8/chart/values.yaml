@@ -1,0 +1,57 @@
+# Sizing Tiers
+tier: "" # Overridden by values-small|medium|large.yaml
+tiers:
+    small:
+        resources:
+            requests:
+                cpu: 1
+                memory: 800Mi
+            limits:
+                cpu: 3
+                memory: 2Gi
+        replicaCount: 1
+        autoscaling:
+            enabled: true
+            minReplicas: 1
+            maxReplicas: 3
+            targetCPUUtilization: 60
+    medium:
+        resources:
+            requests:
+                cpu: 3
+                memory: 4Gi
+            limits:
+                cpu: 5
+                memory: 8Gi
+        replicaCount: 1
+        autoscaling:
+            enabled: true
+            minReplicas: 1
+            maxReplicas: 3
+            targetCPUUtilization: 60
+    large:
+        resources:
+            requests:
+                cpu: 6
+                memory: 12Gi
+            limits:
+                cpu: 8
+                memory: 16Gi
+        replicaCount: 1
+        autoscaling:
+            enabled: true
+            minReplicas: 1
+            maxReplicas: 1
+            targetCPUUtilization: 60
+
+# Gateway router
+router:
+    image: ollama-router:latest
+    replicaCount: 1
+    resources:
+        requests:
+            cpu: 100m
+            memory: 128Mi
+        limits:
+            cpu: 200m
+            memory: 256Mi

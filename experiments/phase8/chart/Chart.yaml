@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ollama-tier
+description: A resuable, autoscaling sizing tier chart for ollama, allowing different ollama models to be allocated to different sized pods
+type: application
+version: 0.1.0
+appVersion: "latest"
