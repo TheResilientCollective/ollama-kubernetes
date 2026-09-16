@@ -1,16 +1,32 @@
 import * as http from "http";
-import { forwardRequest } from "./utils/forwarding";
 import TargettingHandler from "./utils/TargettingHandler";
 import { PodDiscoveryService } from "./utils/PodDiscovery";
 import { QueueItem } from "./models/QueueItem";
+import { Pod } from "./models/Pod";
+import { config } from "./config";
 
-const PORT = 11434;
 const targetting = new TargettingHandler();
 const discovery = new PodDiscoveryService(targetting.targets);
 discovery.startPolling();
 
 const server = http.createServer(
     (request: http.IncomingMessage, response: http.ServerResponse) => {
+        if (request.url === "/api/gateway/status" && request.method === "GET") {
+            response.writeHead(200, { "content-type": "application/json" });
+            response.end(
+                JSON.stringify(
+                    {
+                        timestamp: Date.now(),
+                        queues: QueueItem.getQueueSnapshot(),
+                        pods: Pod.getStateSnapshot(),
+                    },
+                    null,
+                    2,
+                ),
+            );
+            return;
+        }
+
         const contentLength: number = request.headers["content-length"]
             ? parseInt(request.headers["content-length"], 10)
             : NaN;
@@ -42,21 +58,8 @@ const server = http.createServer(
                     request,
                     response,
                     targetTier.name,
-                    () => {},
-                    (error: Error) => {
-                        if (!response.headersSent) {
-                            response.writeHead(500, {
-                                "Content-Type": "application/json",
-                            });
-                            response.end(
-                                JSON.stringify({
-                                    error: error.message,
-                                }),
-                            );
-                        }
-                    },
                     bodyBuffer,
-                    modelName || undefined,
+                    modelName,
                 ).enqueue();
             });
         } else {
@@ -64,19 +67,6 @@ const server = http.createServer(
                 request,
                 response,
                 targetting.defaultTarget.name,
-                () => {},
-                (error: Error) => {
-                    if (!response.headersSent) {
-                        response.writeHead(500, {
-                            "content-type": "application/json",
-                        });
-                        response.end(
-                            JSON.stringify({
-                                error: error.message,
-                            }),
-                        );
-                    }
-                },
             ).enqueue();
         }
     },
@@ -94,6 +84,8 @@ function shutdown() {
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
 
-server.listen(PORT, "0.0.0.0", () => {
-    console.log(`[index] Gateway listening on http://0.0.0.0:${PORT}`);
+server.listen(config.server.port, config.server.host, () => {
+    console.log(
+        `[index] Gateway listening on http://${config.server.host}:${config.server.port}`,
+    );
 });

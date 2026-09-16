@@ -2,6 +2,7 @@ import * as dns from "dns/promises";
 import { Pod } from "../models/Pod";
 import { TargetTier } from "../types/types";
 import { QueueItem } from "../models/QueueItem";
+import { config } from "../config";
 
 export class PodDiscoveryService {
     private targets: TargetTier[];
@@ -14,9 +15,12 @@ export class PodDiscoveryService {
     /**
      * Periodically queries headless DNS for all tiers
      */
-    public startPolling(intervalMs: number = 5000): void {
+    public startPolling(): void {
         this.discoverAll();
-        this.intervalId = setInterval(() => this.discoverAll(), intervalMs);
+        this.intervalId = setInterval(
+            this.discoverAll.bind(this),
+            config.discovery.intervalMs,
+        );
     }
 
     public stopPolling(): void {

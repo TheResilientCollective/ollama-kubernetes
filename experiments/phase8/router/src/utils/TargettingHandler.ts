@@ -1,3 +1,4 @@
+import { config } from "../config";
 import { TargetTier } from "../types/types";
 import { parseK8sSize } from "./utils";
 import * as http from "http";
@@ -40,7 +41,10 @@ export default class TargettingHandler {
         );
 
         this.updateModelCache();
-        setInterval(this.updateModelCache.bind(this), 10000);
+        setInterval(
+            this.updateModelCache.bind(this),
+            config.modelCache.refreshIntervalMs,
+        );
     }
 
     /**
@@ -145,7 +149,7 @@ export default class TargettingHandler {
             },
         );
         request.on("error", advance);
-        request.setTimeout(2000, () => {
+        request.setTimeout(config.modelCache.requestTimeoutMs, () => {
             request.destroy();
             advance();
         });

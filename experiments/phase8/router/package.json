@@ -7,11 +7,7 @@
         "start": "node dist/index.js"
     },
     "devDependencies": {
-        "@types/async-lock": "^1.4.2",
         "@types/node": "^26.5.1",
         "typescript": "^7.0.2"
-    },
-    "dependencies": {
-        "async-lock": "^1.4.1"
     }
 }

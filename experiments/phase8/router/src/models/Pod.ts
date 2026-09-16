@@ -1,4 +1,5 @@
 import * as http from "http";
+import { config } from "../config";
 
 export class Pod {
     private static pods: Map<string, Pod> = new Map();
@@ -56,6 +57,26 @@ export class Pod {
     }
 
     /**
+     * Gets a snapshot of pods, ips, and requests.
+     * Useful for observability
+     */
+    public static getStateSnapshot(): {} {
+        const snapshot: Record<string, any[]> = {};
+        for (const [ip, pod] of this.pods) {
+            if (!snapshot[pod.tier]) {
+                snapshot[pod.tier] = [];
+            }
+            snapshot[pod.tier].push({
+                ip: pod.ip,
+                activeRequests: pod.activeRequests.length,
+                loadedModels: pod.loadedModels,
+                lastPolledMsAgo: Date.now() - pod.lastPolled,
+            });
+        }
+        return snapshot;
+    }
+
+    /**
      * Removes a pod from tracked pods and stops regular polling
      */
     public delete(): void {
@@ -66,12 +87,12 @@ export class Pod {
     /**
      * Begins regular check of which models are loaded on this pod
      */
-    public startPolling(intervalMs: number = 10000): void {
+    public startPolling(): void {
         if (this.isPolling) this.stopPolling();
 
         this.pollingIntervalId = setInterval(
             () => this.getLoadedModels(),
-            intervalMs,
+            config.podPolling.intervalMs,
         );
     }
 
@@ -90,7 +111,7 @@ export class Pod {
      */
     private async getLoadedModels(): Promise<void> {
         return new Promise<void>((resolve) => {
-            const url = `http://${this.ip}:11434/api/ps`;
+            const url = `http://${this.ip}:${config.ollama.port}/api/ps`;
             const request = http.get(url, (response) => {
                 let data = "";
                 response.on("data", (chunk: string | Buffer) => {
@@ -119,7 +140,7 @@ export class Pod {
                 });
             });
 
-            request.setTimeout(2000, () => {
+            request.setTimeout(config.podPolling.requestTimeoutMs, () => {
                 request.destroy();
             });
 

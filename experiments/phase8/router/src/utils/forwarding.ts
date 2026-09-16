@@ -1,5 +1,6 @@
 import * as http from "http";
 import { TargetTier } from "../types/types";
+import { config } from "../config";
 
 /**
  * Handle forwarding the request from this server to the appropriate target server.
@@ -70,7 +71,7 @@ export async function forwardRequest(
 
         function handleProxyTimeout() {
             console.error(
-                `[Forwarding] Target "${target.name}" failed to respond within ${TIMEOUT_MS}ms`,
+                `[Forwarding] Target "${target.name}" failed to respond within ${config.forwarding.responseTimeoutMs}ms`,
             );
             proxyRequest.destroy();
 
@@ -85,7 +86,12 @@ export async function forwardRequest(
                         message: `The sizing pod "${target.name}" took too long to begin responding. This can happen during cold starts or model loading deadlocks.`,
                     }),
                 );
+            } else {
+                if (!response.writableEnded) {
+                    response.end();
+                }
             }
+            cleanupAndResolve();
         }
 
         function handleClientClose() {
@@ -106,12 +112,14 @@ export async function forwardRequest(
             resolve();
         }
 
-        const TIMEOUT_MS = 120000;
-        proxyRequest.setTimeout(TIMEOUT_MS, handleProxyTimeout);
+        proxyRequest.setTimeout(
+            config.forwarding.responseTimeoutMs,
+            handleProxyTimeout,
+        );
         proxyRequest.on("error", handleProxyError);
 
         response.on("finish", cleanupAndResolve);
-        response.on("close", cleanupAndResolve);
+        response.on("close", handleClientClose);
 
         if (bufferedBody) {
             proxyRequest.write(bufferedBody);

@@ -1,15 +1,11 @@
 import * as http from "http";
 import { Pod } from "../models/Pod";
 import { forwardRequest } from "../utils/forwarding";
-import AsyncLock from "async-lock";
 import { TargetTier } from "../types/types";
+import { config } from "../config";
 
 export class QueueItem {
     private static queues: Map<string, QueueItem[]> = new Map();
-    private static lock: AsyncLock = new AsyncLock();
-    private static MAX_CONCURRENCY = 1;
-    private static MAX_QUEUE_SIZE = 10;
-    private static MAX_QUEUE_WAIT_TIME_MS = 30000;
 
     public readonly request: http.IncomingMessage;
     public readonly response: http.ServerResponse;
@@ -17,8 +13,6 @@ export class QueueItem {
     public readonly tier: string;
     public readonly modelName?: string;
 
-    private readonly resolve: () => void;
-    private readonly reject: (err: Error) => void;
     private readonly createdAt: number;
 
     private isExecuted: boolean = false;
@@ -31,23 +25,19 @@ export class QueueItem {
         request: http.IncomingMessage,
         response: http.ServerResponse,
         tier: string,
-        resolve: () => void,
-        reject: (error: Error) => void,
         bufferedBody?: Buffer,
         modelName?: string,
     ) {
         this.request = request;
         this.response = response;
         this.tier = tier;
-        this.resolve = resolve;
-        this.reject = reject;
         this.bufferedBody = bufferedBody;
         this.modelName = modelName;
         this.createdAt = Date.now();
 
         // Handle aborted requests
         this.isExecuted = false;
-        this.request.on("close", () => {
+        this.response.on("close", () => {
             if (!this.isExecuted && !this.response.writableEnded) {
                 // cancel timeout
                 if (this.enqueuedWaitTimeoutId) {
@@ -55,17 +45,15 @@ export class QueueItem {
                     this.enqueuedWaitTimeoutId = null;
                 }
                 // remove from queue
-                const queue = QueueItem.queues.get(this.tier);
+                const queue = this.queue;
                 if (queue) {
-                    QueueItem.lock.acquire(this.tier, () => {
-                        const index = queue.indexOf(this);
-                        if (index !== -1) {
-                            queue.splice(index, 1);
-                            console.log(
-                                `[Queue] Removed aborted request for "${this.modelName}" from "${this.tier}" queue before execution.`,
-                            );
-                        }
-                    });
+                    const index = queue.indexOf(this);
+                    if (index !== -1) {
+                        queue.splice(index, 1);
+                        console.log(
+                            `[Queue] Removed aborted request for "${this.modelName}" from "${this.tier}" queue before execution.`,
+                        );
+                    }
                 }
             }
         });
@@ -82,7 +70,7 @@ export class QueueItem {
             QueueItem.queues.set(this.tier, queue);
         }
 
-        if (queue.length >= QueueItem.MAX_QUEUE_SIZE) {
+        if (queue.length >= config.queue.maxSizePerTier) {
             console.warn(
                 `[Queue] Tier "${this.tier}" queue is staurated (queue length ${queue.length}). Rejecting incoming request.`,
             );
@@ -96,7 +84,6 @@ export class QueueItem {
                         "The cluster is currently experiencing extremely high demand. Please try again later.",
                 }),
             );
-            this.reject(new Error("Queue saturated"));
             return;
         }
         queue.push(this);
@@ -106,7 +93,7 @@ export class QueueItem {
 
         this.enqueuedWaitTimeoutId = setTimeout(
             this.handleQueueTimeout.bind(this),
-            QueueItem.MAX_QUEUE_WAIT_TIME_MS,
+            config.queue.maxWaitMs,
         );
 
         QueueItem.dispatch(this.tier);
@@ -119,28 +106,25 @@ export class QueueItem {
     private handleQueueTimeout() {
         const queue = this.queue;
         if (queue) {
-            QueueItem.lock.acquire(this.tier, () => {
-                const index = queue.indexOf(this);
-                if (index !== -1) {
-                    queue.splice(index, 1);
-                    console.warn(
-                        `[Queue] Request for "${this.modelName}" in tier "${this.tier}" timed out waiting in queue.`,
+            const index = queue.indexOf(this);
+            if (index !== -1) {
+                queue.splice(index, 1);
+                console.warn(
+                    `[Queue] Request for "${this.modelName}" in tier "${this.tier}" timed out waiting in queue.`,
+                );
+                if (!this.response.headersSent) {
+                    this.response.writeHead(503, {
+                        "content-type": "application/json",
+                    });
+                    this.response.end(
+                        JSON.stringify({
+                            error: "Service Unavailable",
+                            message:
+                                "The request timed out waiting in the queue due to high demand. Please try again later.",
+                        }),
                     );
-                    if (!this.response.headersSent) {
-                        this.response.writeHead(503, {
-                            "content-type": "application/json",
-                        });
-                        this.response.end(
-                            JSON.stringify({
-                                error: "Service Unavailable",
-                                message:
-                                    "The request timed out waiting in the queue due to high demand. Please try again later.",
-                            }),
-                        );
-                    }
-                    this.reject(new Error("Queue wait timeout exceeded"));
                 }
-            });
+            }
         }
     }
 
@@ -161,38 +145,36 @@ export class QueueItem {
     public static dispatch(tier: string): void {
         const queue = this.queues.get(tier);
         if (!queue || queue.length === 0) return;
-        this.lock.acquire(tier, () => {
-            if (!queue || queue.length === 0) return;
-            // Check if there are any available pods
-            const pods = Pod.getByTier(tier);
-            if (pods.length === 0) {
-                console.warn(`[Queue] No pods ready for tier "${tier}" yet.`);
-                return;
-            }
-            const availablePods = pods.filter(
-                (pod) => pod.activeRequests.length < this.MAX_CONCURRENCY,
-            );
-            if (availablePods.length === 0) return;
+        // Check if there are any available pods
+        const pods = Pod.getByTier(tier);
+        if (pods.length === 0) {
+            console.warn(`[Queue] No pods ready for tier "${tier}" yet.`);
+            return;
+        }
+        const availablePods = pods.filter(
+            (pod) =>
+                pod.activeRequests.length < config.queue.maxConcurrencyPerPod,
+        );
+        if (availablePods.length === 0) return;
 
-            // Find the best pod
-            const nextQueueItem = queue.shift()!;
-            if (!nextQueueItem) return;
-            // pod with model already loaded
-            let targetPod = availablePods.find((pod) =>
-                nextQueueItem.modelName
-                    ? pod.loadedModels.includes(nextQueueItem.modelName)
-                    : false,
-            );
-            // least busy pod
-            if (!targetPod) {
-                targetPod = availablePods.sort(
-                    (a, b) => a.activeRequests.length - b.activeRequests.length,
-                )[0];
-            }
+        // Find the best pod
+        const nextQueueItem = queue.shift()!;
+        if (!nextQueueItem) return;
+        // pod with model already loaded
+        let targetPod = availablePods.find((pod) =>
+            nextQueueItem.modelName
+                ? pod.loadedModels.includes(nextQueueItem.modelName)
+                : false,
+        );
+        // least busy pod
+        if (!targetPod) {
+            targetPod = availablePods.sort(
+                (a, b) => a.activeRequests.length - b.activeRequests.length,
+            )[0];
+        }
 
-            // Execute
-            nextQueueItem.executeOnPod(targetPod);
-        });
+        // Execute
+        nextQueueItem.executeOnPod(targetPod);
     }
 
     /**
@@ -200,10 +182,15 @@ export class QueueItem {
      */
     private executeOnPod(pod: Pod): void {
         // Make sure request is still active and clear timeouts
-        if (this.request.destroyed) {
+        if (
+            this.response.destroyed ||
+            this.response.writableEnded ||
+            this.response.socket?.destroyed
+        ) {
             console.log(
                 `[Queue] Request for "${this.modelName}" was aborted before execution. Skipping.`,
             );
+            QueueItem.dispatch(this.tier);
             return;
         }
         this.isExecuted = true;
@@ -242,5 +229,19 @@ export class QueueItem {
                 QueueItem.dispatch(this.tier);
             }).bind(this),
         );
+    }
+
+    public static getQueueSnapshot() {
+        const snapshot: Record<string, any> = {};
+        for (const [tier, queue] of this.queues) {
+            snapshot[tier] = {
+                length: queue.length,
+                items: queue.map((item) => ({
+                    modelName: item.modelName,
+                    queuedDurationMs: Date.now() - item.createdAt,
+                })),
+            };
+        }
+        return snapshot;
     }
 }
