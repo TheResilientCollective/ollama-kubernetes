@@ -4,41 +4,11 @@ import { PodDiscoveryService } from "./utils/PodDiscovery";
 import { QueueItem } from "./models/QueueItem";
 import { Pod } from "./models/Pod";
 import { config } from "./config";
-import { register, Gauge, Counter, Histogram } from "prom-client";
-import { QueueSnapshot } from "./types/types";
+import { updateQueueMetrics, writeMetrics } from "./utils/metrics";
 
 const targetting = new TargettingHandler();
 const discovery = new PodDiscoveryService(targetting.targets);
 discovery.startPolling();
-
-// Prometheus Metrics
-const queueLengthGauge = new Gauge({
-    name: "ollama_gateway_queue_length",
-    help: "For the various pod sizes (small/medium/large), each has its own queue. This is the current length of that queue, with pod tier labels",
-    labelNames: ["tier"],
-});
-
-const waitTimeHistogram = new Histogram({
-    name: "ollama_gateway_wait_time_seconds",
-    help: "The time requests spend waiting in the queue",
-    labelNames: ["tier"],
-    buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60, 120, 300],
-});
-
-function updateQueueMetrics() {
-    const queueSnapshot: QueueSnapshot = QueueItem.getQueueSnapshot();
-    const averageQueueTimes = QueueItem.consumeAverageQueueTimes();
-    config.tiers.forEach((tier: string) => {
-        if (queueSnapshot[tier]) {
-            queueLengthGauge.set({ tier }, queueSnapshot[tier].length);
-        }
-        if (averageQueueTimes.get(tier)) {
-            const queueTimes = averageQueueTimes.get(tier)!;
-            const average = queueTimes.sum / queueTimes.count;
-            waitTimeHistogram.observe({ tier }, average);
-        }
-    });
-}
 
 setInterval(updateQueueMetrics, config.metrics.intervalMs);
 
@@ -62,12 +32,7 @@ const server = http.createServer(
 
         if (request.url === "/metrics" && request.method === "GET") {
             try {
-                const metrics = await register.metrics();
-                response.writeHead(200, {
-                    "content-type": register.contentType,
-                });
-                response.end(metrics);
-                console.log(`[index] /metrics served`);
+                await writeMetrics(request, response);
             } catch (error: any) {
                 console.error(`[index] Error serving metrics:`, error);
                 if (!response.headersSent) {
