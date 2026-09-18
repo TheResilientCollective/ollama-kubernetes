@@ -21,8 +21,8 @@ spec:
         - type: prometheus
           metadata:
             serverAddress: http://{{ .Values.monitoring.prometheus.host | trimPrefix "http://" }}:{{ .Values.monitoring.prometheus.port }}
-            metricName: ollama_gateway_queue_length
-            query: sum(ollama_gateway_queue_length{tier="{{ .Values.tier }}"})
+            metricName: ollama_gateway_queue_length # TODO: should probably publish a new metric that is the number of free pods
+            query: sum(ollama_gateway_queue_length{tier="{{ .Values.tier }}"}) # TODO: target number of pods should be (queue_length + 1)
             threshold: "{{ .Values.keda.threshold | default 1 }}"
             activationThreshold: "{{ .Values.keda.activationThreshold | default 0 }}"
 {{- end }}
