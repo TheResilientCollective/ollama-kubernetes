@@ -1,0 +1,28 @@
+{{- $tierConfig := index .Values.tiers .Values.tier -}}
+{{- if and (ne .Values.tier "router") $tierConfig.autoscaling.enabled (not .Values.keda.enabled) }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+    name: ollama-{{ .Release.Name }}
+    namespace: "{{ .Release.Namespace }}"
+    labels:
+        app: ollama
+        tier: "{{ .Values.tier }}"
+spec:
+    maxReplicas: {{ $tierConfig.autoscaling.maxReplicas }}
+    metrics:
+        - resource:
+              name: cpu
+              target:
+                  averageUtilization: {{ $tierConfig.autoscaling.targetCPUUtilization }}
+                  type: Utilization
+          type: Resource
+    minReplicas: {{ $tierConfig.autoscaling.minReplicas }}
+    scaleTargetRef:
+        apiVersion: apps/v1
+        kind: Deployment
+        name: ollama-{{ .Release.Name }}
+    behavior:
+        scaleDown:
+            stabilizationWindowSeconds: 300
+{{- end}}

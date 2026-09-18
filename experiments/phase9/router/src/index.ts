@@ -1,0 +1,145 @@
+import * as http from "http";
+import TargettingHandler from "./utils/TargettingHandler";
+import { PodDiscoveryService } from "./utils/PodDiscovery";
+import { QueueItem } from "./models/QueueItem";
+import { Pod } from "./models/Pod";
+import { config } from "./config";
+import { register, Gauge, Counter, Histogram } from "prom-client";
+import { QueueSnapshot } from "./types/types";
+
+const targetting = new TargettingHandler();
+const discovery = new PodDiscoveryService(targetting.targets);
+discovery.startPolling();
+
+// Prometheus Metrics
+const queueLengthGauge = new Gauge({
+    name: "ollama_gateway_queue_length",
+    help: "For the various pod sizes (small/medium/large), each has its own queue. This is the current length of that queue, with pod tier labels",
+    labelNames: ["tier"],
+});
+
+const waitTimeHistogram = new Histogram({
+    name: "ollama_gateway_wait_time_seconds",
+    help: "The time requests spend waiting in the queue",
+    labelNames: ["tier"],
+    buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60, 120, 300],
+});
+
+function updateQueueMetrics() {
+    const queueSnapshot: QueueSnapshot = QueueItem.getQueueSnapshot();
+    const averageQueueTimes = QueueItem.consumeAverageQueueTimes();
+    config.tiers.forEach((tier: string) => {
+        if (queueSnapshot[tier]) {
+            queueLengthGauge.set({ tier }, queueSnapshot[tier].length);
+        }
+        if (averageQueueTimes.get(tier)) {
+            const queueTimes = averageQueueTimes.get(tier)!;
+            const average = queueTimes.sum / queueTimes.count;
+            waitTimeHistogram.observe({ tier }, average);
+        }
+    });
+}
+
+setInterval(updateQueueMetrics, config.metrics.intervalMs);
+
+const server = http.createServer(
+    async (request: http.IncomingMessage, response: http.ServerResponse) => {
+        if (request.url === "/api/gateway/status" && request.method === "GET") {
+            response.writeHead(200, { "content-type": "application/json" });
+            response.end(
+                JSON.stringify(
+                    {
+                        timestamp: Date.now(),
+                        queues: QueueItem.getQueueSnapshot(),
+                        pods: Pod.getStateSnapshot(),
+                    },
+                    null,
+                    2,
+                ),
+            );
+            return;
+        }
+
+        if (request.url === "/metrics" && request.method === "GET") {
+            try {
+                const metrics = await register.metrics();
+                response.writeHead(200, {
+                    "content-type": register.contentType,
+                });
+                response.end(metrics);
+                console.log(`[index] /metrics served`);
+            } catch (error: any) {
+                console.error(`[index] Error serving metrics:`, error);
+                if (!response.headersSent) {
+                    response.writeHead(500, { "content-type": "text/plain" });
+                }
+                if (!response.writableEnded) {
+                    response.end("Internal server error");
+                }
+            } finally {
+                return;
+            }
+        }
+
+        const contentLength: number = request.headers["content-length"]
+            ? parseInt(request.headers["content-length"], 10)
+            : NaN;
+        const isChunked =
+            (request.headers["transfer-encoding"] || "").toLowerCase() ===
+            "chunked";
+        const hasBody =
+            (!isNaN(contentLength) && contentLength > 0) || isChunked;
+
+        if (hasBody) {
+            let bodyChunks: Buffer[] = [];
+            request.on("data", (chunk: Buffer) => bodyChunks.push(chunk));
+            request.on("end", () => {
+                const bodyBuffer = Buffer.concat(bodyChunks);
+                let modelName = null;
+
+                try {
+                    const bodyJson = JSON.parse(bodyBuffer.toString());
+                    modelName = bodyJson.model;
+                } catch (error: any) {
+                    console.warn(
+                        "[index] Failed to parse JSON body:",
+                        error.message ?? error.toString(),
+                    );
+                }
+
+                const targetTier = targetting.resolveTargetPod(modelName);
+                new QueueItem(
+                    request,
+                    response,
+                    targetTier.name,
+                    bodyBuffer,
+                    modelName,
+                ).enqueue();
+            });
+        } else {
+            new QueueItem(
+                request,
+                response,
+                targetting.defaultTarget.name,
+            ).enqueue();
+        }
+    },
+);
+
+function shutdown() {
+    console.log("[index] Shutting down gateway...");
+    discovery.stopPolling();
+    server.close(() => {
+        console.log("[index] Gateway server stopped.");
+        process.exit(0);
+    });
+}
+
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
+
+server.listen(config.server.port, config.server.host, () => {
+    console.log(
+        `[index] Gateway listening on http://${config.server.host}:${config.server.port}`,
+    );
+});

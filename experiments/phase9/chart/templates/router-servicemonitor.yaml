@@ -1,0 +1,21 @@
+{{- if eq .Values.tier "router" -}}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+    name: ollama-router-metrics
+    namespace: {{ .Release.Namespace }}
+    labels:
+        release: prometheus
+spec:
+    selector:
+        matchLabels:
+            app: ollama-router
+    namespaceSelector:
+        matchNames:
+            - {{ .Release.Namespace }}
+    endpoints:
+        - port: http
+          path: /metrics
+          interval: 15s
+          scrapeTimeout: 10s
+{{- end }}
