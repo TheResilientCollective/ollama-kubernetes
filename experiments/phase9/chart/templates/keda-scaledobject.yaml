@@ -13,16 +13,16 @@ spec:
         apiVersion: apps/v1
         kind: Deployment
         name: ollama-{{ .Release.Name }}
-    pollingInterval: {{ $tierConfig.keda.pollingInterval | default .Values.keda.pollingInterval | default 5 }}
-    cooldownPeriod: {{ $tierConfig.keda.cooldownPeriod | default .Values.keda.cooldownPeriod | default 60 }}
-    minReplicaCount: {{ $tierConfig.keda.minReplicaCount | default .Values.keda.minReplicaCount | default 1 }}
-    maxReplicaCount: {{ $tierConfig.keda.maxReplicaCount | default .Values.keda.maxReplicaCount | default 3 }}
+    pollingInterval: {{ $tierConfig.keda.pollingInterval | default .Values.keda.pollingInterval | default 0 }}
+    cooldownPeriod: {{ $tierConfig.keda.cooldownPeriod | default .Values.keda.cooldownPeriod | default 0 }}
+    minReplicaCount: {{ $tierConfig.keda.minReplicaCount | default .Values.keda.minReplicaCount | default 0 }}
+    maxReplicaCount: {{ $tierConfig.keda.maxReplicaCount | default .Values.keda.maxReplicaCount | default 0 }}
     triggers:
         - type: prometheus
           metadata:
             serverAddress: http://{{ .Values.monitoring.prometheus.host | trimPrefix "http://" }}:{{ .Values.monitoring.prometheus.port }}
-            metricName: ollama_gateway_queue_length # TODO: should probably publish a new metric that is the number of free pods
-            query: sum(ollama_gateway_queue_length{tier="{{ .Values.tier }}"}) # TODO: target number of pods should be (queue_length + 1)
-            threshold: "{{ .Values.keda.threshold | default 1 }}"
+            metricName: ollama_gateway_all_pending_queries
+            query: {{ $tierConfig.keda.query | default .Values.keda.query }}
+            threshold: "{{ .Values.keda.threshold | default 0 }}"
             activationThreshold: "{{ .Values.keda.activationThreshold | default 0 }}"
 {{- end }}

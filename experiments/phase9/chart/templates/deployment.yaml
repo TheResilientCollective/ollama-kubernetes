@@ -11,7 +11,10 @@ metadata:
 spec:
     replicas: {{ $tierConfig.replicaCount }}
     strategy:
-        type: Recreate
+        type: Recreate # RollingUpdate # Recreate
+        # rollingUpdate:
+        #     maxSurge: 1
+        #     maxUnavailable: 0
     selector:
         matchLabels:
             app: ollama
@@ -53,24 +56,24 @@ spec:
                               - -c
                               - |
                                   [ "$(ollama list | wc -l)" -gt 1 ]
-                      initialDelaySeconds: 10
-                      periodSeconds: 10
+                      initialDelaySeconds: 5
+                      periodSeconds: 5
                       timeoutSeconds: 5
-                      failureThreshold: 3
+                      failureThreshold: 10
                   livenessProbe:
                       httpGet:
                           path: /
                           port: 11434
-                      initialDelaySeconds: 30
-                      periodSeconds: 10
+                      initialDelaySeconds: 15
+                      periodSeconds: 5
                       timeoutSeconds: 5
-                      failureThreshold: 3
+                      failureThreshold: 5
                   startupProbe:
                       httpGet:
                           path: /
                           port: 11434
-                      initialDelaySeconds: 10
-                      periodSeconds: 10
+                      initialDelaySeconds: 5
+                      periodSeconds: 5
                       timeoutSeconds: 5
                       failureThreshold: 30
             volumes:

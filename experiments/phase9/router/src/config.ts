@@ -10,7 +10,7 @@ export const config = {
         port: parseInt(process.env.OLLAMA_PORT || "11434"),
     },
     discovery: {
-        intervalMs: parseInt(process.env.DISCOVERY_INTERVAL_MS || "5000"),
+        intervalMs: parseInt(process.env.DISCOVERY_INTERVAL_MS || "1000"),
     },
     modelCache: {
         refreshIntervalMs: parseInt(
@@ -21,7 +21,7 @@ export const config = {
         ),
     },
     podPolling: {
-        intervalMs: parseInt(process.env.POD_POLLING_INTERVAL_MS || "10000"),
+        intervalMs: parseInt(process.env.POD_POLLING_INTERVAL_MS || "1000"),
         requestTimeoutMs: parseInt(
             process.env.POD_POLLING_REQUEST_TIMEOUT_MS || "2000",
         ),
@@ -35,10 +35,10 @@ export const config = {
         maxConcurrencyPerPod: parseInt(
             process.env.QUEUE_MAX_CONCURRENCY_PER_POD || "1",
         ),
-        maxSizePerTier: parseInt(process.env.QUEUE_MAX_SIZE_PER_TIER || "10"),
+        maxSizePerTier: parseInt(process.env.QUEUE_MAX_SIZE_PER_TIER || "5"),
         maxWaitMs: parseInt(process.env.QUEUE_MAX_WAIT_MS || "30000"),
     },
     metrics: {
-        intervalMs: parseInt(process.env.METRICS_INTERVAL_MS || "15000"),
+        intervalMs: parseInt(process.env.METRICS_INTERVAL_MS || "1000"),
     },
 };
