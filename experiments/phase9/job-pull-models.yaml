@@ -16,7 +16,7 @@ spec:
                       - name: OLLAMA_MODELS
                         value: /models
                       - name: MODELS
-                        value: qwen2.5-coder:3b llama3.2:1b gemma4:26b
+                        value: qwen2.5-coder:3b llama3.2:1b gemma4:e2b
                   command:
                       - /bin/sh
                       - -c
