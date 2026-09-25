@@ -3,6 +3,7 @@ import { config } from "../config";
 import { PodStateSnapshot } from "../types/types";
 
 export class Pod {
+    /** Mapping between ip and Pod */
     private static pods: Map<string, Pod> = new Map();
 
     public readonly ip: string;

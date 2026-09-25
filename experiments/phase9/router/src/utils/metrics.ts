@@ -18,9 +18,15 @@ const waitTimeHistogram = new Histogram({
     buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60, 120, 300],
 });
 
-const totalQueries = new Gauge({
+const totalQueriesGauge = new Gauge({
     name: "ollama_gateway_all_pending_queries",
     help: "All of the requests that are currently being handled by a pod and all of the queued requests. sum(activeRequests, queuedRequests)",
+    labelNames: ["tier"],
+});
+
+const idlePodsGauge = new Gauge({
+    name: "ollama_gateway_idle_pods",
+    help: "Number of pods with zero active requests. These pods can be safely scaled down",
     labelNames: ["tier"],
 });
 
@@ -38,13 +44,23 @@ export function updateQueueMetrics() {
             queueLengthGauge.set({ tier }, queuedRequestsInTier);
 
             const activePodsInTier: PodSnapshot[] = podSnapshot[tier];
+            if (!activePodsInTier) {
+                totalQueriesGauge.set({ tier }, queuedRequestsInTier);
+                idlePodsGauge.set({ tier }, 0);
+                return;
+            }
             const activeRequestsInTier: number = activePodsInTier
                 .map((pod) => pod.activeRequests)
                 .reduce((sum, accumulator) => sum + accumulator, 0);
-            totalQueries.set(
+            totalQueriesGauge.set(
                 { tier },
                 activeRequestsInTier + queuedRequestsInTier,
             );
+
+            const idlePodsInTier = activePodsInTier.filter(
+                (pod) => pod.activeRequests === 0,
+            ).length;
+            idlePodsGauge.set({ tier }, idlePodsInTier);
         }
         if (averageQueueTimes.get(tier)) {
             const queueTimes = averageQueueTimes.get(tier)!;
