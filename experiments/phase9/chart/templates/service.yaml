@@ -1,4 +1,4 @@
-{{- if ne .Values.tier "router" -}}
+{{- if ne .Values.tier "infrastructure" -}}
 apiVersion: v1
 kind: Service
 metadata:

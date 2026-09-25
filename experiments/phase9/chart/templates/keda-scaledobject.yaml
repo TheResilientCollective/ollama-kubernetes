@@ -1,4 +1,4 @@
-{{- if and (ne .Values.tier "router") .Values.keda.enabled }}
+{{- if and (ne .Values.tier "infrastructure") .Values.keda.enabled }}
 {{- $tierConfig := index .Values.tiers .Values.tier -}}
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject

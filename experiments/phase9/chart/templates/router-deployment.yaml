@@ -1,4 +1,4 @@
-{{- if eq .Values.tier "router" -}}
+{{- if eq .Values.tier "infrastructure" -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -38,15 +38,15 @@ spec:
                           name: ollama-router-config
                   readinessProbe:
                       httpGet:
-                          path: /api/tags
+                          path: "/api/gateway/status"
                           port: 11434
-                      initialDelaySeconds: 10
-                      periodSeconds: 10
+                      initialDelaySeconds: 5
+                      periodSeconds: 2
                       timeoutSeconds: 2
                       failureThreshold: 3
                   livenessProbe:
                       httpGet:
-                          path: /api/gateway/status
+                          path: "/metrics"
                           port: 11434
                       initialDelaySeconds: 5
                       periodSeconds: 5

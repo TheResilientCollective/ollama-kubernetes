@@ -1,4 +1,4 @@
-{{- if ne .Values.tier "router" }}
+{{- if ne .Values.tier "infrastructure" }}
 {{- $tierConfig := index .Values.tiers .Values.tier -}}
 apiVersion: apps/v1
 kind: Deployment
@@ -11,10 +11,12 @@ metadata:
 spec:
     replicas: {{ $tierConfig.replicaCount }}
     strategy:
-        type: Recreate # RollingUpdate # Recreate
-        # rollingUpdate:
-        #     maxSurge: 1
-        #     maxUnavailable: 0
+        type: {{ .Values.updateStrategy }}
+        {{- if eq .Values.updateStrategy "RollingUpdate" }}
+        rollingUpdate:
+            maxSurge: 1
+            maxUnavailable: 0
+        {{- end }}
     selector:
         matchLabels:
             app: ollama
@@ -76,6 +78,10 @@ spec:
                       periodSeconds: 5
                       timeoutSeconds: 5
                       failureThreshold: 30
+                  lifecycle:
+                      preStop:
+                          exec:
+                              command: ["/bin/sh/", "-c", "curl -sf http://ollama-router:11434/api/gateway/disable-pod -H 'Content-Type: application/json' -d '{\"ip\": \"$(hostname -i)\", \"tier\": \"$(SIZE_CLASS)\"}' || true"]
             volumes:
                 - name: models
                   persistentVolumeClaim:

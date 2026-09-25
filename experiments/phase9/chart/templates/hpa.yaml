@@ -1,5 +1,5 @@
 {{- $tierConfig := index .Values.tiers .Values.tier -}}
-{{- if and (ne .Values.tier "router") $tierConfig.autoscaling.enabled (not .Values.keda.enabled) }}
+{{- if and (ne .Values.tier "infrastructure") $tierConfig.autoscaling.enabled (not .Values.keda.enabled) }}
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:

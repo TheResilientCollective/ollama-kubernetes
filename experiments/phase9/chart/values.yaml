@@ -78,7 +78,7 @@ router:
         targetCPUUtilization: 60
 
 keda:
-    enabled: true
+    enabled: false
     minReplicaCount: 1
     maxReplicaCount: 3
     pollingInterval: 1
@@ -87,7 +87,25 @@ keda:
     activationThreshold: 0
     # query: sum(ollama_gateway_all_pending_queries{tier="{{ .Values.tier }}"}) + 1
 
+customScaler:
+    enabled: true
+    image: scaling-controller:latest
+    idleThresholdSeconds:
+        small: "5"
+        medium: "5"
+        large: "5"
+    minReplicas:
+        small: "1"
+        medium: "0"
+        large: "0"
+    maxReplicas:
+        small: "5"
+        medium: "3"
+        large: "2"
+
 monitoring:
     prometheus:
         host: prometheus-kube-prometheus-prometheus.monitoring.svc
         port: 9090
+
+updateStrategy: Recreate # RollingUpdate

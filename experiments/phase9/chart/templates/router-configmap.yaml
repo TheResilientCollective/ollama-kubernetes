@@ -1,4 +1,4 @@
-{{- if eq .Values.tier "router" -}}
+{{- if eq .Values.tier "infrastructure" -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
