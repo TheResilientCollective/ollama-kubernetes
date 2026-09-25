@@ -325,8 +325,7 @@ class K8sClient:
 
             # Get pod name
             name = K8sClient.get_pod_name_from_ip(pod.ip)
-            if not name:
-                logger.warn(f"Couldn't find pod name", ip=pod.ip)
+            if not name:  # happens when scaling down
                 continue
 
             # Add to list
