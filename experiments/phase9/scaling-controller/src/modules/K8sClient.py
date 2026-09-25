@@ -311,12 +311,6 @@ class K8sClient:
         idle_pods_with_metadata: list[IdlePodStatus] = []
 
         for pod in idle_pods:
-            logger.debug(
-                "Checking pod for idle status",
-                pod=pod,
-                type=type(pod),
-                is_idle_type=isinstance(pod, IdlePodStatus),
-            )
             # Get idle duration
             last_timestamp: datetime = most_recent_status.datetime
             idle_started: datetime = most_recent_status.datetime
@@ -344,12 +338,12 @@ class K8sClient:
                     **pod.model_dump(), name=name, idle_duration=idle_duration
                 )
             )
-            logger.debug(
-                f"Pod idle duration determined",
-                ip=pod.ip,
-                name=name,
-                idle_duration=idle_duration,
-            )
+            # logger.debug(
+            #     f"Pod idle duration determined",
+            #     ip=pod.ip,
+            #     name=name,
+            #     idle_duration=idle_duration,
+            # )
 
         return idle_pods_with_metadata
 

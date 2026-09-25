@@ -16,7 +16,6 @@ k8s = K8sClient()
 async def main():
     while True:
         # try:
-        logger.debug("Polling Router")
         status = (
             await k8s.poll_router()
         )  # TODO: this is blocking. Move to asyncio tasks

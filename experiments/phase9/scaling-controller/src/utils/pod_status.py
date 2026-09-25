@@ -53,12 +53,10 @@ def get_idle_pods_in(tier: str, status: Status) -> list[PodStatus]:
 
     for pod in pods:
         isIdle = check_if_pod_is_idle(tier, pod.ip, status)
-        logger.debug(f"Checked if pod was idle", pod=pod, idle=isIdle)
         if not isIdle:
             continue
 
         # Add to list
         idle_pods.append(pod)
-        logger.debug(f"Found idle pod", pod=pod)
 
     return idle_pods

@@ -7,7 +7,7 @@ from utils.pod_status import *
 
 def calculate_desired_pods(tier: str, status: Status) -> int:
     if tier not in status.queues:  # no requests have even been sent yet
-        logger.debug("Queue doesn't exist yet", tier=tier)
+        # logger.debug("Queue doesn't exist yet", tier=tier)
         return Config.min_replicas[tier]
 
     # Get queue
@@ -15,7 +15,6 @@ def calculate_desired_pods(tier: str, status: Status) -> int:
 
     if tier not in status.pods:
         # Handle scale from 0
-        logger.debug("Scale from 0", tier=tier, pods=0)
         target_replicas = queue_length
     else:
         # Get idle pods
