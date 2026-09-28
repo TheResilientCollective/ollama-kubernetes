@@ -212,7 +212,6 @@ class RequestGridApp(App[None]):
         try:
             if self.stream:
                 state.streaming = True
-                collected = ""
 
                 async with client.stream(
                     self.method,
@@ -223,24 +222,8 @@ class RequestGridApp(App[None]):
                     state.status = str(response.status_code)
 
                     async for chunk in response.aiter_text():
-                        collected += chunk
-
-                        try:
-                            parsed = json.loads(collected)
-                            if isinstance(parsed, dict):
-                                content = parsed.get("message", {}).get("content", "")
-                                if content:
-                                    full_output = json.dumps(parsed, indent=2)
-                                    state.output = full_output
-                                    self.append_output(state, "")
-                                    collected = ""
-                        except json.JSONDecodeError:
-                            pass
-
+                        state.output += chunk
                         self.append_output(state, chunk)
-
-                state.output = collected
-                self.append_output(state, "")
 
             else:
                 response = await client.request(
@@ -276,7 +259,7 @@ class RequestGridApp(App[None]):
     async def send_requests(self) -> None:
         summary = self.query_one("#summary", Static)
 
-        timeout = httpx.Timeout(self.timeout)
+        timeout = None
 
         async with httpx.AsyncClient(timeout=timeout) as client:
             tasks = [

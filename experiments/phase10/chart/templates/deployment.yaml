@@ -1,0 +1,133 @@
+{{- if ne .Values.tier "infrastructure" }}
+{{- $tierConfig := index .Values.tiers .Values.tier -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: ollama-{{ .Release.Name }}
+    namespace: "{{ .Release.Namespace }}"
+    labels:
+        app: ollama
+        tier: "{{ .Values.tier }}"
+spec:
+    replicas: {{ $tierConfig.replicaCount }}
+    strategy:
+        type: {{ .Values.updateStrategy }}
+        {{- if eq .Values.updateStrategy "RollingUpdate" }}
+        rollingUpdate:
+            maxSurge: 1
+            maxUnavailable: 0
+        {{- end }}
+    selector:
+        matchLabels:
+            app: ollama
+            tier: "{{ .Values.tier }}"
+    template:
+        metadata:
+            labels:
+                app: ollama
+                tier: "{{ .Values.tier }}"
+        spec:
+            {{- if .Values.gpu.enabled }}
+            nodeSelector:
+                {{- if eq .Values.gpu.vendor "nvidia" }}
+                nvidia.com/gpu: "true"
+                {{- else if eq .Values.gpu.vendor "amd" }}
+                amd.com/gpu: "true"
+                {{- end }}
+            tolerations:
+                - key: "{{ .Values.gpu.tolerations.key }}"
+                  operator: "{{ .Values.gpu.tolerations.operator }}"
+                  effect: "{{ .Values.gpu.tolerations.effect }}"
+            {{- end }}
+            containers:
+                - name: ollama
+                  {{- if eq .Values.gpu.vendor "amd" }}
+                  image: ollama/ollama:rocm
+                  {{- else }}
+                  image: ollama/ollama:latest
+                  {{- end }}
+                  imagePullPolicy: IfNotPresent
+                  ports:
+                      - containerPort: 11434
+                  env:
+                      - name: OLLAMA_MODELS
+                        value: /models
+                      - name: SIZE_CLASS
+                        value: "{{ .Values.tier }}"
+                  envFrom:
+                      - configMapRef:
+                            name: ollama-config
+                  volumeMounts:
+                      - name: models
+                        mountPath: /models
+                      {{- if eq .Values.gpu.vendor "amd" }}
+                      - name: dev-kfd
+                        mountPath: /dev/kfd
+                      - name: dev-dri
+                        mountPath: /dev/dri
+                      {{- end }}
+                  resources:
+                      requests:
+                          cpu: "{{ $tierConfig.resources.requests.cpu }}"
+                          memory: "{{ $tierConfig.resources.requests.memory }}"
+                          {{- if .Values.gpu.enabled }}
+                          {{- if eq .Values.gpu.vendor "nvidia" }}
+                          nvidia.com/gpu: "1"
+                          {{- else if eq .Values.gpu.vendor "amd" }}
+                          amd.com/gpu: "1"
+                          {{- end }}
+                          {{- end }}
+                      limits:
+                          cpu: "{{ $tierConfig.resources.limits.cpu }}"
+                          memory: "{{ $tierConfig.resources.limits.memory }}"
+                          {{- if .Values.gpu.enabled }}
+                          {{- if eq .Values.gpu.vendor "nvidia" }}
+                          nvidia.com/gpu: "1"
+                          {{- else if eq .Values.gpu.vendor "amd" }}
+                          amd.com/gpu: "1"
+                          {{- end }}
+                          {{- end }}
+                  readinessProbe:
+                      exec:
+                          command:
+                              - /bin/sh
+                              - -c
+                              - |
+                                  [ "$(ollama list | wc -l)" -gt 1 ]
+                      initialDelaySeconds: 5
+                      periodSeconds: 5
+                      timeoutSeconds: 5
+                      failureThreshold: 10
+                  livenessProbe:
+                      httpGet:
+                          path: /
+                          port: 11434
+                      initialDelaySeconds: 15
+                      periodSeconds: 5
+                      timeoutSeconds: 5
+                      failureThreshold: 5
+                  startupProbe:
+                      httpGet:
+                          path: /
+                          port: 11434
+                      initialDelaySeconds: 5
+                      periodSeconds: 5
+                      timeoutSeconds: 5
+                      failureThreshold: 30
+                  lifecycle:
+                      preStop:
+                          exec:
+                              command: ["/bin/sh/", "-c", "curl -sf http://ollama-router:11434/api/gateway/disable-pod -H 'Content-Type: application/json' -d '{\"ip\": \"$(hostname -i)\", \"tier\": \"$(SIZE_CLASS)\"}' || true"]
+            volumes:
+                - name: models
+                  persistentVolumeClaim:
+                      claimName: ollama-models
+                {{- if eq .Values.gpu.vendor "amd" }}
+                - name: dev-kfd
+                  hostPath:
+                      path: /dev/kfd
+                - name: dev-dri
+                  hostPath:
+                      path: /dev/dri
+                {{- end }}
+{{- end }}

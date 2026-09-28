@@ -1,0 +1,18 @@
+{{- if eq .Values.tier "infrastructure" -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: ollama-router-config
+    namespace: "{{ .Release.Namespace }}"
+data:
+    TARGET_SMALL_ENDPOINT: "http://ollama-small:11434"
+    TARGET_SMALL_SIZE: "{{ .Values.tiers.small.resources.requests.memory }}"
+    TARGET_SMALL_HEADLESS_DNS: "ollama-small-headless.{{ .Release.Namespace }}.svc.cluster.local"
+    TARGET_MEDIUM_ENDPOINT: "http://ollama-medium:11434"
+    TARGET_MEDIUM_SIZE: "{{ .Values.tiers.medium.resources.requests.memory }}"
+    TARGET_MEDIUM_HEADLESS_DNS: "ollama-medium-headless.{{ .Release.Namespace }}.svc.cluster.local"
+    TARGET_LARGE_ENDPOINT: "http://ollama-large:11434"
+    TARGET_LARGE_SIZE: "{{ .Values.tiers.large.resources.requests.memory }}"
+    TARGET_LARGE_HEADLESS_DNS: "ollama-large-headless.{{ .Release.Namespace }}.svc.cluster.local"
+    TIERS: '{{ keys .Values.tiers | toJson }}'
+{{- end -}}

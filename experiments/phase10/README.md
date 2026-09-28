@@ -1,0 +1,131 @@
+# Phase 10 - GPU support
+
+## Start the cluster
+
+```bash
+kubectl apply -f pvc.yaml -n ollama
+kubectl apply -f configmap.yaml -n ollama
+kubectl apply -f job-pull-models.yaml -n ollama
+
+helm install small ./chart/ -f values-small.yaml -n ollama
+helm install medium ./chart/ -f values-medium.yaml -n ollama
+helm install large ./chart/ -f values-large.yaml -n ollama
+helm install infrastructure ./chart/ -f values-infrastructure/yaml -n ollama
+```
+
+## GPU Support
+
+There are a few toggles to make depending on which GPU you are using:
+
+### Nvidia
+
+Make sure NVIDIA drivers are installed on the host machine and Kubernetes
+
+1. Add Nvidia plugin to kubernetes
+
+```bash
+# Install NVIDIA device plugin
+kubectl apply -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.15.0/nvidia-device-plugin.yml
+```
+
+2. Label and taint GPU nodes:
+
+```bash
+kubectl label nodes <gpu-node-name> nvidia.com/gpu=true
+kubectl taint nodes <gpu-node-name> nvidia.com/gpu:NoSchedule
+```
+
+3. Configure **chart/values.yaml** to set `.gpu.vendor` and `.gpu.tolerations.key` to the Nvidia versions. And make sure `.gpu.enabled` is `true`
+
+### AMD
+
+1. Add AMD plugin to kubernetes
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/ROCm/k8s-device-plugin/main/k8s-ds-amdgpu-dp.yaml
+```
+
+2. Label and taint GPU nodes:
+
+```bash
+kubectl label nodes <gpu-node-name> amd.com/gpu=true
+kubectl taint nodes <gpu-node-name> amd.com/gpu:NoSchedule
+```
+
+3. Configure **chart/values.yaml** to set `.gpu.vendor` and `.gpu.tolerations.key` to the AMD versions. And make sure `.gpu.enabled` is `true`
+
+### Apple
+
+In **chart/values.yaml** make sure `.gpu.enabled` is `false`. Metal GPU access is automatic in OrbStack and other docker implementations.
+
+---
+
+## Scaling
+
+There is a custom autoscaler implemented that you should treat as the default. For legacy support, you can still use KEDA or HPA by enabling them in **chart/values.yaml**. If you use the KEDA scaler, you will need to add KEDA and Prometheus to helm:
+
+**KEDA**
+
+```bash
+helm repo add kedacore https://kedacore.github.io/charts
+helm install keda kedacore/keda \
+    --namespace keda \
+    --create-namespace
+```
+
+**Prometheus**
+
+```bash
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm install prometheus prometheus-community/kube-prometheus-stack \
+    --namespace monitoring \
+    --create-namespace
+```
+
+Once this is done, you can install the helm charts for small/medium/large/router
+
+## Port Forwarding
+
+#### Exposing the router/gateway
+
+This let's you send queries to ollama
+
+```bash
+kubectl port-forward -n ollama deployment/ollama-router 11434:11434
+```
+
+Now you can run
+
+```bash
+curl http://localhost:11434/api/generate -d '{"model": "llama3.2:1b": "prompt": "hi"}'
+```
+
+#### Grafana
+
+Exposing Prometheus's built in Grafana GUI:
+
+```bash
+kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
+```
+
+Now open up [Grafana http://localhost:3000/](http://localhost:3000) in the browser.
+It will ask you to login. The login information can be found:
+
+```bash
+kubectl get secrets -n monitoring | grep grafana
+kubectl get secret -n monitoring prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+```
+
+This gives you the default login password.
+**user**: `admin`
+**password**: `<output from get secret>`
+You can then change the password in the portal if you want.
+
+#### Prometheus GUI
+
+```bash
+kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090
+```
+
+Now open up [Prometheus http://localhost:9090/](http://localhost:9090/) in the browser.
+It is not secured by a password, so **don't do this in production**

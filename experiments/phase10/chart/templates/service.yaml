@@ -1,0 +1,20 @@
+{{- if ne .Values.tier "infrastructure" -}}
+apiVersion: v1
+kind: Service
+metadata:
+    name: ollama-{{ .Release.Name }}
+    namespace: "{{ .Release.Namespace }}"
+    labels:
+        app: ollama
+        tier: "{{ .Values.tier }}"
+spec:
+    type: ClusterIP
+    ports:
+        - port: 11434
+          targetPort: 11434
+          protocol: TCP
+          name: http
+    selector:
+        app: ollama
+        tier: "{{ .Values.tier }}"
+{{- end }}
