@@ -1,0 +1,28 @@
+{{- if and (ne .Values.tier "infrastructure") .Values.keda.enabled }}
+{{- $tierConfig := index .Values.tiers .Values.tier -}}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+    name: ollama-{{ .Release.Name }}-{{ .Values.tier }}-scaler
+    namespace: {{ .Release.Namespace }}
+    labels:
+        app: ollama
+        tier: {{ .Values.tier }}
+spec:
+    scaleTargetRef:
+        apiVersion: apps/v1
+        kind: Deployment
+        name: ollama-{{ .Release.Name }}
+    pollingInterval: {{ $tierConfig.keda.pollingInterval | default .Values.keda.pollingInterval | default 0 }}
+    cooldownPeriod: {{ $tierConfig.keda.cooldownPeriod | default .Values.keda.cooldownPeriod | default 0 }}
+    minReplicaCount: {{ $tierConfig.keda.minReplicaCount | default .Values.keda.minReplicaCount | default 0 }}
+    maxReplicaCount: {{ $tierConfig.keda.maxReplicaCount | default .Values.keda.maxReplicaCount | default 0 }}
+    triggers:
+        - type: prometheus
+          metadata:
+            serverAddress: http://{{ .Values.monitoring.prometheus.host | trimPrefix "http://" }}:{{ .Values.monitoring.prometheus.port }}
+            metricName: ollama_gateway_all_pending_queries
+            query: {{ $tierConfig.keda.query | default .Values.keda.query }}
+            threshold: "{{ .Values.keda.threshold | default 0 }}"
+            activationThreshold: "{{ .Values.keda.activationThreshold | default 0 }}"
+{{- end }}

@@ -1,0 +1,18 @@
+{{- if eq .Values.tier "infrastructure" -}}
+apiVersion: v1
+kind: Service
+metadata:
+    name: ollama-router
+    namespace: {{ .Release.Namespace }}
+    labels:
+        app: ollama-router
+spec:
+    type: ClusterIP
+    ports:
+        - port: 11434
+          targetPort: 11434
+          protocol: TCP
+          name: http
+    selector:
+        app: ollama-router
+{{- end }}
