@@ -25,7 +25,37 @@ Make sure NVIDIA drivers are installed on the host machine and Kubernetes
 
 ```bash
 # Install NVIDIA device plugin
-kubectl apply -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.15.0/nvidia-device-plugin.yml
+helm repo add nvdp https://nvidia.github.io/k8s-device-plugin
+helm repo update
+# On x64
+helm install nvdp nvdp/nvidia-device-plugin -n nvidia-device-plugin
+```
+
+For Nvidia Jetson:
+
+```bash
+kubectl label node c4h-jetson-orin-nano-1 nvidia.com/gpu.present=true
+helm install nvdp nvdp/nvidia-device-plugin \
+  --namespace nvidia-device-plugin \
+  --create-namespace \
+  --version 0.20.1
+```
+
+Edit _/var/snap/microk8s/7988/args/containerd.toml_ and add
+
+```toml
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
+  runtime_type = "io.containerd.runc.v2"
+  [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
+    BinaryName = "nvidia-container-runtime"
+```
+
+```bash
+sudo ln -sf /usr/lib/aarch64-linux-gnu/nvidia/*.so* /usr/lib/aarch64-linux-gnu/
+```
+
+```bash
+kubectl get pods -n kube-system | grep nvidia
 ```
 
 2. Label and taint GPU nodes:
