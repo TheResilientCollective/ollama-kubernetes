@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-    name: ollama-config
-    namespace: ollama-phase6
-data:
-    OLLAMA_KEEP_ALIVE: "5m"
-    OLLAMA_HOST: "0.0.0.0"

@@ -1,9 +1,0 @@
-tier: small
-
-resources:
-    requests:
-        cpu: 1
-        memory: 3Gi
-    limits:
-        cpu: 3
-        memory: 6Gi
