@@ -1,6 +1,0 @@
-storage:
-    type: s3-external
-    s3External:
-        enabled: true
-        bucket: "ollama-models-resilient-490004653742-us-west-2"
-        region: "us-west-2"

@@ -72,16 +72,6 @@ gpu:
         operator: "Exists"
         effect: "NoSchedule"
 
-storage:
-    type: local
-    s3External:
-        enabled: false
-        bucket: ""
-        region: ""
-    local:
-        storageClass: "local-path"
-        size: "20Gi"
-
 # Gateway router
 router:
     image: ollama-router:latest

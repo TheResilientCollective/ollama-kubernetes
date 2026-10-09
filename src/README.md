@@ -2,21 +2,6 @@
 
 ## SDSC Additions
 
-Skip this section if your storage disks have decent read/write speeds.
-
-On the San Diego Supercomputing Center, the disk read/write speeds are extremely slow, so as a work around we are using an S3 bucket on AWS for hosting the LLM models. This is done by mounting the S3 bucket as part of the file system using `rclone`. To do this without permanent credentials, we have to setup a certificate manager that refreshes keys with AWS Private Certificate Authority.
-
-```bash
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
-
-# Install CSI Driver via Helm
-helm repo add jetstack https://charts.jetstack.io
-helm repo update
-helm install cert-manager-csi-driver jetstack/cert-manager-csi-driver \
-  --namespace cert-manager \
-  --create-namespace
-```
-
 ## Start the cluster
 
 ```bash
@@ -24,8 +9,6 @@ kubectl apply -f pvc.yaml -n ollama
 kubectl apply -f configmap.yaml -n ollama
 kubectl apply -f job-pull-models.yaml -n ollama
 ```
-
-You may wish/need to augment each helm installation with additonal files specifying the hardward you are deploying on. For instance, at SDSC, you should add an additional `-f values-sdsc.yaml` to each of the below lines (e.g. `helm install small ./chart/ -f values-small.yaml -f values-sdsc.yaml -n ollama`)
 
 ```bash
 helm install small ./chart/ -f values-small.yaml -n ollama
