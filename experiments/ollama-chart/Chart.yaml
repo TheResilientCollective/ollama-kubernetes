@@ -1,6 +1,0 @@
-apiVersion: v2
-name: ollama
-description: Ollama LLM inference with persisten storage so pods share downloaded models
-type: application
-version: 0.1.0
-appVersion: "latest"
