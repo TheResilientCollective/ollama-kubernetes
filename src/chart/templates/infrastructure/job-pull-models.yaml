@@ -23,14 +23,14 @@ spec:
                       - -c
                       - |
                           set -eu
-                          flock /models/.pull.lock -c "
-                              ollama serve & SERVE_PID=\$!; sleep 10;
-                              for M in $MODELS; do
-                                  ollama pull \$M;
-                                  ollama list | grep -F -q \$M;
-                              done;
-                              kill \$SERVE_PID; wait \$SERVE_PID 2>/dev/null || true
-                          "
+                          ollama serve &
+                          SERVE_PID=$!
+                          sleep 10
+                          for M in $MODELS; do
+                              ollama pull "$M";
+                              ollama list | grep -F -q "$M";
+                          done;
+                          kill $SERVE_PID; wait $SERVE_PID 2>/dev/null || true
                   volumeMounts:
                       - name: models
                         mountPath: /models
