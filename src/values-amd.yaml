@@ -1,0 +1,9 @@
+gpu:
+    enabled: true
+    vendor: "amd"
+    count: 1
+    ollamaImage: ollama/ollama:rocm
+    tolerations:
+        key: "amd.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"

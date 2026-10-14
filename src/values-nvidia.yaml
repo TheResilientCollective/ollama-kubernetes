@@ -1,0 +1,8 @@
+gpu:
+    enabled: true # set to true for Nvidia and AMD GPUs
+    vendor: "nvidia"
+    count: 1
+    tolerations:
+        key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"

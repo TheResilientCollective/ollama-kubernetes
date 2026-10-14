@@ -1,0 +1,24 @@
+## WARNING: this does require some extra effort to build the ollamaImage yourself.
+
+gpu:
+    ## Apple Silicon
+    # enabled: false # set to false for Apple Silicon GPUs
+    ## Nvidia Discrete GPUs
+    # enabled: true
+    # vendor: "nvidia"
+    ## AMD Discrete GPUs
+    # enabled: true
+    # vendor: "amd"
+    # ollamaImage: ollama/ollama:rocm
+    ## Nvidia Jetson
+    enabled: true
+    vendor: "jetson"
+    ollamaImage: ollama:r39.2.tegra-aarch64-cu132-24.04-ollama # custom build
+    ollamaCommand: ["ollama", "serve"]
+
+    count: 1
+    tolerations:
+        key: "nvidia.com/gpu"
+        # key: "amd.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"

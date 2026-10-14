@@ -61,16 +61,7 @@ tiers:
             query: sum(ollama_gateway_all_pending_queries{tier="large"})
 
 gpu:
-    enabled: false # set to false for Apple Silicon GPUs
-    # enabled: true # set to true for Nvidia and AMD GPUs
-    vendor: "nvidia"
-    # vendor: "amd"
-    count: 1
-    tolerations:
-        key: "nvidia.com/gpu"
-        # key: "amd.com/gpu"
-        operator: "Exists"
-        effect: "NoSchedule"
+    enabled: false
 
 # Gateway router
 router:
