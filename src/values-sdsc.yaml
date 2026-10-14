@@ -1,6 +1,7 @@
 ollama:
     volume:
         hostPath:
-            path: /var/lib/rancher/k3s/storage/ollama-models
+            path: /home/ubuntu/ollama-models
+            # path: /var/lib/rancher/k3s/storage/ollama-models
             type: DirectoryOrCreate
         persistentVolumeClaim: null
