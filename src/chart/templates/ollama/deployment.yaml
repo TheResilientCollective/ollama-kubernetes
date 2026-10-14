@@ -54,9 +54,22 @@ spec:
                         value: /models
                       - name: SIZE_CLASS
                         value: "{{ .Values.tier }}"
-                  envFrom:
-                      - configMapRef:
-                            name: ollama-config
+                      - name: OLLAMA_KEEP_ALIVE
+                        value: "5m"
+                      - name: OLLAMA_HOST
+                        value: "0.0.0.0"
+                      # - name: TARGET_SMALL_ENDPOINT
+                      #   value: http://ollama-small:11434
+                      # - name: TARGET_MEDIUM_ENDPOINT
+                      #   value: http://ollama-medium:11434
+                      # - name: TARGET_LARGE_ENDPOINT
+                      #   value: http://ollama-large:11434
+                      # - name: TARGET_SMALL_SIZE
+                      #   value: "3Gi"
+                      # - name: TARGET_MEDIUM_SIZE
+                      #   value: "4Gi"
+                      # - name: TARGET_LARGE_SIZE
+                      #   value: "12Gi"
                   volumeMounts:
                       - name: models
                         mountPath: /models
@@ -120,8 +133,7 @@ spec:
                               command: ["/bin/sh/", "-c", "curl -sf http://ollama-router:11434/api/gateway/disable-pod -H 'Content-Type: application/json' -d '{\"ip\": \"$(hostname -i)\", \"tier\": \"$(SIZE_CLASS)\"}' || true"]
             volumes:
                 - name: models
-                  persistentVolumeClaim:
-                      claimName: ollama-models
+                  {{- .Values.ollama.volume | toYaml | nindent 18 }}
                 {{- if eq .Values.gpu.vendor "amd" }}
                 - name: dev-kfd
                   hostPath:

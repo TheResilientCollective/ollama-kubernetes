@@ -115,6 +115,11 @@ customScaler:
         medium: "3"
         large: "2"
 
+ollama:
+    volume:
+        persistentVolumeClaim:
+            claimName: ollama-models
+
 monitoring:
     prometheus:
         host: prometheus-kube-prometheus-prometheus.monitoring.svc

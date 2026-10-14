@@ -1,0 +1,6 @@
+ollama:
+    volume:
+        hostPath:
+            path: /var/lib/rancher/k3s/storage/ollama-models
+            type: DirectoryOrCreate
+        persistentVolumeClaim: null

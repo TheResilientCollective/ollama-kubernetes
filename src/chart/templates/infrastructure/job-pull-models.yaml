@@ -1,3 +1,4 @@
+{{- if eq .Values.tier "infrastructure" -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -35,5 +36,5 @@ spec:
                         mountPath: /models
             volumes:
                 - name: models
-                  persistentVolumeClaim:
-                      claimName: ollama-models
+                  {{- .Values.ollama.volume | toYaml | nindent 18 }}
+{{- end }}
