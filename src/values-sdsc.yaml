@@ -11,16 +11,16 @@ ollama:
         periodSeconds: 10
         timeoutSeconds: 15
         failureThreshold: 10
-    livenessProbe:
-        initialDelaySeconds: 15
-        periodSeconds: 10
-        timeoutSeconds: 10
-        failureThreshold: 5
-    startupProbe:
-        initialDelaySeconds: 20
-        periodSeconds: 10
-        timeoutSeconds: 10
-        failureThreshold: 30
+    # livenessProbe:
+    #     initialDelaySeconds: 15
+    #     periodSeconds: 10
+    #     timeoutSeconds: 10
+    #     failureThreshold: 5
+    # startupProbe:
+    #     initialDelaySeconds: 20
+    #     periodSeconds: 10
+    #     timeoutSeconds: 10
+    #     failureThreshold: 30
 
 pullmodels:
     volumes:

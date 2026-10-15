@@ -102,26 +102,26 @@ spec:
                               - -c
                               - |
                                   [ "$(ollama list | wc -l)" -gt 1 ]
-                      initialDelaySeconds: {{ default 5 .Values.ollama.readinessProbe.initialDelaySeconds }}
-                      periodSeconds: {{ default 5 .Values.ollama.readinessProbe.periodSeconds }}
-                      timeoutSeconds: {{ default 5 .Values.ollama.readinessProbe.timeoutSeconds }}
-                      failureThreshold: {{ default 10 .Values.ollama.readinessProbe.failureThreshold }}
+                      initialDelaySeconds: {{ ((.Values.ollama).readinessProbe).initialDelaySeconds | default 5 }}
+                      periodSeconds: {{  ((.Values.ollama).readinessProbe).periodSeconds | default 5 }}
+                      timeoutSeconds: {{  ((.Values.ollama).readinessProbe).timeoutSeconds | default 5 }}
+                      failureThreshold: {{  ((.Values.ollama).readinessProbe).failureThreshold | default 10 }}
                   livenessProbe:
                       httpGet:
                           path: /
                           port: 11434
-                      initialDelaySeconds: {{ default 15 .Values.ollama.livenessProbe.initialDelaySeconds }}
-                      periodSeconds: {{ default 5 .Values.ollama.livenessProbe.periodSeconds }}
-                      timeoutSeconds: {{ default 5 .Values.ollama.livenessProbe.timeoutSeconds }}
-                      failureThreshold: {{ default 5 .Values.ollama.livenessProbe.failureThreshold }}
+                      initialDelaySeconds: {{ ((.Values.ollama).livenessProbe).initialDelaySeconds | default 15 }}
+                      periodSeconds: {{  ((.Values.ollama).livenessProbe).periodSeconds | default 5 }}
+                      timeoutSeconds: {{  ((.Values.ollama).livenessProbe).timeoutSeconds | default 5 }}
+                      failureThreshold: {{  ((.Values.ollama).livenessProbe).failureThreshold | default 5 }}
                   startupProbe:
                       httpGet:
                           path: /
                           port: 11434
-                      initialDelaySeconds: {{ default 5 .Values.ollama.startupProbe.initialDelaySeconds }}
-                      periodSeconds: {{ default 5 .Values.ollama.startupProbe.periodSeconds }}
-                      timeoutSeconds: {{ default 5 .Values.ollama.startupProbe.timeoutSeconds }}
-                      failureThreshold: {{ default 30 .Values.ollama.startupProbe.failureThreshold }}
+                      initialDelaySeconds: {{  ((.Values.ollama).startupProbe).initialDelaySeconds | default 5 }}
+                      periodSeconds: {{  ((.Values.ollama).startupProbe).periodSeconds | default 5 }}
+                      timeoutSeconds: {{  ((.Values.ollama).startupProbe).timeoutSeconds | default 5 }}
+                      failureThreshold: {{  ((.Values.ollama).startupProbe).failureThreshold | default 30 }}
                   lifecycle:
                       preStop:
                           exec:
