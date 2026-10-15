@@ -31,10 +31,15 @@ spec:
                               ollama list | grep -F -q "$M";
                           done;
                           kill $SERVE_PID; wait $SERVE_PID 2>/dev/null || true
+                          {{ .Values.pullmodels.commandAdditions }}
                   volumeMounts:
-                      - name: models
-                        mountPath: /models
+                  {{- $volumeMounts := mergeOverwrite .Values.ollama.volumeMounts .Values.pullmodels.volumeMounts }}
+                  {{- range $key, $val := $volumeMounts }}
+                      - {{ $val | toYaml | indent 24 | trim }}
+                  {{- end }}
             volumes:
-                - name: models
-                  {{- .Values.ollama.volume | toYaml | nindent 18 }}
+            {{- $volumes := mergeOverwrite .Values.ollama.volumes .Values.pullmodels.volumes }}
+            {{- range $key, $val := $volumes }}
+                - {{ $val | toYaml | indent 18 | trim }}
+            {{- end }}
 {{- end }}

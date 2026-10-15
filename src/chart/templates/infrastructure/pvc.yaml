@@ -1,5 +1,5 @@
 {{- if eq .Values.tier "infrastructure" }}
-{{- if .Values.ollama.volume.persistentVolumeClaim }}
+{{- if .Values.ollama.volumes.modelsVolume.persistentVolumeClaim }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

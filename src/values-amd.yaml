@@ -7,3 +7,21 @@ gpu:
         key: "amd.com/gpu"
         operator: "Exists"
         effect: "NoSchedule"
+
+ollama:
+    volumes:
+        kfd:
+            name: dev-kfd
+            hostPath:
+                path: /dev/kfd
+        dri:
+            name: dev-dri
+            hostPath:
+                path: /dev/dri
+    volumeMounts:
+        kfd:
+            name: dev-kfd
+            mountPath: /dev/kfd
+        dri:
+            name: dev-dri
+            mountPath: /dev/dri

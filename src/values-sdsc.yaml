@@ -1,7 +1,28 @@
 ollama:
-    volume:
-        hostPath:
-            path: /home/ubuntu/ollama-models
-            # path: /var/lib/rancher/k3s/storage/ollama-models
-            type: DirectoryOrCreate
-        persistentVolumeClaim: null
+    volumes:
+        modelsVolume:
+            name: models
+            hostPath:
+                path: /home/ubuntu/ollama-models
+                type: DirectoryOrCreate
+            persistentVolumeClaim: null
+
+pullmodels:
+    volumes:
+        modelsVolume:
+            name: models
+            emptyDir: {}
+            persistentVolumeClaim: null
+        s3mount:
+            name: s3-mount
+            hostPath:
+                path: /home/ubuntu/ollama-models
+                type: DirectoryOrCreate
+    volumeMounts:
+        modelsVolumeMount:
+            name: models
+            mountPath: /models
+        s3mount:
+            name: s3-mount
+            mountPath: /s3
+    commandAdditions: echo "Copying models to shared S3 bucket"; cp -rv /models/* /s3/; echo "Done"

@@ -107,9 +107,19 @@ customScaler:
         large: "2"
 
 ollama:
-    volume:
-        persistentVolumeClaim:
-            claimName: ollama-models
+    volumes:
+        modelsVolume:
+            name: models
+            persistentVolumeClaim:
+                claimName: ollama-models
+    volumeMounts:
+        modelsVolumeMount:
+            name: models
+            mountPath: /models
+
+pullmodels:
+    volumes: {} # merges with .Values.ollama.volumes
+    volumeMounts: {} # merges with .Values.ollama.volumeMounts
 
 monitoring:
     prometheus:

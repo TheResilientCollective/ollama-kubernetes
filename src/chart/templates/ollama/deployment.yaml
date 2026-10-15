@@ -71,14 +71,9 @@ spec:
                       # - name: TARGET_LARGE_SIZE
                       #   value: "12Gi"
                   volumeMounts:
-                      - name: models
-                        mountPath: /models
-                      {{- if eq .Values.gpu.vendor "amd" }}
-                      - name: dev-kfd
-                        mountPath: /dev/kfd
-                      - name: dev-dri
-                        mountPath: /dev/dri
-                      {{- end }}
+                  {{- range $key, $val := .Values.ollama.volumeMounts }}
+                      - {{ $val | toYaml | indent 24 | trim }}
+                  {{- end }}
                   resources:
                       requests:
                           cpu: "{{ $tierConfig.resources.requests.cpu }}"
@@ -132,14 +127,7 @@ spec:
                           exec:
                               command: ["/bin/sh/", "-c", "curl -sf http://ollama-router:11434/api/gateway/disable-pod -H 'Content-Type: application/json' -d '{\"ip\": \"$(hostname -i)\", \"tier\": \"$(SIZE_CLASS)\"}' || true"]
             volumes:
-                - name: models
-                  {{- .Values.ollama.volume | toYaml | nindent 18 }}
-                {{- if eq .Values.gpu.vendor "amd" }}
-                - name: dev-kfd
-                  hostPath:
-                      path: /dev/kfd
-                - name: dev-dri
-                  hostPath:
-                      path: /dev/dri
-                {{- end }}
+            {{- range $key, $val := .Values.ollama.volumes }}
+                - {{ $val | toYaml | indent 18 | trim }}
+            {{- end }}
 {{- end }}
