@@ -102,26 +102,26 @@ spec:
                               - -c
                               - |
                                   [ "$(ollama list | wc -l)" -gt 1 ]
-                      initialDelaySeconds: 5
-                      periodSeconds: 5
-                      timeoutSeconds: 5
-                      failureThreshold: 10
+                      initialDelaySeconds: {{ default 5 .Values.ollama.readinessProbe.initialDelaySeconds }}
+                      periodSeconds: {{ default 5 .Values.ollama.readinessProbe.periodSeconds }}
+                      timeoutSeconds: {{ default 5 .Values.ollama.readinessProbe.timeoutSeconds }}
+                      failureThreshold: {{ default 10 .Values.ollama.readinessProbe.failureThreshold }}
                   livenessProbe:
                       httpGet:
                           path: /
                           port: 11434
-                      initialDelaySeconds: 15
-                      periodSeconds: 5
-                      timeoutSeconds: 5
-                      failureThreshold: 5
+                      initialDelaySeconds: {{ default 15 .Values.ollama.livenessProbe.initialDelaySeconds }}
+                      periodSeconds: {{ default 5 .Values.ollama.livenessProbe.periodSeconds }}
+                      timeoutSeconds: {{ default 5 .Values.ollama.livenessProbe.timeoutSeconds }}
+                      failureThreshold: {{ default 5 .Values.ollama.livenessProbe.failureThreshold }}
                   startupProbe:
                       httpGet:
                           path: /
                           port: 11434
-                      initialDelaySeconds: 5
-                      periodSeconds: 5
-                      timeoutSeconds: 5
-                      failureThreshold: 30
+                      initialDelaySeconds: {{ default 5 .Values.ollama.startupProbe.initialDelaySeconds }}
+                      periodSeconds: {{ default 5 .Values.ollama.startupProbe.periodSeconds }}
+                      timeoutSeconds: {{ default 5 .Values.ollama.startupProbe.timeoutSeconds }}
+                      failureThreshold: {{ default 30 .Values.ollama.startupProbe.failureThreshold }}
                   lifecycle:
                       preStop:
                           exec:

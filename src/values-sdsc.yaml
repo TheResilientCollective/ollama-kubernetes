@@ -6,6 +6,21 @@ ollama:
                 path: /home/ubuntu/ollama-models
                 type: DirectoryOrCreate
             persistentVolumeClaim: null
+    readinessProbe:
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 15
+        failureThreshold: 10
+    livenessProbe:
+        initialDelaySeconds: 15
+        periodSeconds: 10
+        timeoutSeconds: 10
+        failureThreshold: 5
+    startupProbe:
+        initialDelaySeconds: 20
+        periodSeconds: 10
+        timeoutSeconds: 10
+        failureThreshold: 30
 
 pullmodels:
     volumes:
@@ -26,4 +41,4 @@ pullmodels:
         s3mount:
             name: s3-mount
             mountPath: /s3
-    commandAdditions: echo "Copying models to shared S3 mount"; rsync -av --copy-links /models/ /s3/; echo "Copying complete"
+    commandAdditions: echo "Installing rsync"; apt update; apt install rsync -y; echo "Copying models to shared S3 mount"; rsync -av --copy-links --no-perms --no-owner --no-group --inplace /models/ /s3/; echo "Copying complete"
