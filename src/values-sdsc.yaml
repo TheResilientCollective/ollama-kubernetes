@@ -13,6 +13,7 @@ pullmodels:
             name: models
             emptyDir: {}
             persistentVolumeClaim: null
+            hostPath: null
         s3mount:
             name: s3-mount
             hostPath:
