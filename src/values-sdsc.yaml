@@ -26,4 +26,4 @@ pullmodels:
         s3mount:
             name: s3-mount
             mountPath: /s3
-    commandAdditions: echo "Copying models to shared S3 bucket"; cp -rv /models/* /s3/; echo "Done"
+    commandAdditions: echo "Copying models to shared S3 mount"; rsync -av --copy-links /models/ /s3/; echo "Copying complete"
