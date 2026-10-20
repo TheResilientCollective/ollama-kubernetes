@@ -41,6 +41,9 @@ spec:
                       - name: MAX_REPLICAS_{{ $key | upper }}
                         value: "{{ index $.Values.customScaler.maxReplicas $key }}"
                       {{- end }}
+                      {{- if .Values.customScaler.env }}
+                      {{- .Values.customScaler.env | toYaml | nindent 22 }}
+                      {{- end }}
             tolerations:
                 - key: "node-role.kubernetes.io/control-plane"
                   operator: "Equal"
