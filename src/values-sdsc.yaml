@@ -48,9 +48,9 @@ customScaler:
     image: scaling-controller:latest
     env:
         - name: USE_NODE_PROVISIONER
-          value: true
+          value: "true"
         - name: MAX_NODES
-          value: 10
+          value: "10"
         - name: NODE_SCALE_UP_COMMAND
           value: |
               openstack server create \
