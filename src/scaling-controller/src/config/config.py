@@ -2,6 +2,8 @@ import json
 import os
 from typing import TypedDict
 
+import requests
+
 from utils.staticproperty import staticproperty
 
 
@@ -67,3 +69,37 @@ class Config:
         for tier in Config.tiers:
             ret[tier] = int(os.environ.get(f"MAX_REPLICAS_{tier.upper()}", 0))
         return ret
+
+    @staticmethod
+    def test_config():
+        from utils.logging import logger
+
+        logger = logger.bind(namespace=Config.namespace)
+        logger.info("Testing the configuration")
+
+        # Check if we're in a kubernetes pod
+        import os
+
+        assert os.path.exists(
+            os.environ.get("KUBECONFIG", "~/.kube/config")
+        ), "Scaling Controller must be run inside of kubernetes"
+
+        # Check if Node Provisioner is configured
+        if Config.use_node_provisioner:
+            assert (
+                Config.node_scale_up_command
+            ), "Missing NODE_SCALE_UP_COMMAND environment variable"
+            assert (
+                Config.node_scale_down_command
+            ), "Missing NODE_SCALE_DOWN_COMMAND environment variable"
+
+        # Check access to router
+        try:
+            response = requests.get(Config.router_endpoint + "/api/tags")
+            assert response.status_code == 200
+        except Exception as e:
+            raise Exception(
+                f"Could not reach {Config.router_endpoint+"/api/tags"} (environment variable ROUTER_ENDPOINT={Config.router_endpoint})"
+            )
+
+        logger.info("Configuration tests passed")

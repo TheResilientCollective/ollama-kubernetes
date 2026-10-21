@@ -11,10 +11,9 @@ from modules.NodeProvisioner import NodeProvisioner
 from utils.logging import logger
 from utils.replica_calculations import calculate_desired_pods
 
-k8s = K8sClient()
-
 
 async def main():
+    k8s = K8sClient()
     while True:
         # try:
         status = (
@@ -38,5 +37,6 @@ async def main():
 
 
 if __name__ == "__main__":
-    logger.info("Scaling Handler started")
+    logger.info("Scaling Controller started")
+    Config.test_config()
     asyncio.run(main())
