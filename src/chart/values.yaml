@@ -92,7 +92,7 @@ keda:
 
 customScaler:
     enabled: true
-    image: scaling-controller:latest
+    image: tlsharkey/ollama-kubernetes-scaling-controller:latest
     idleThresholdSeconds:
         small: "5"
         medium: "5"
