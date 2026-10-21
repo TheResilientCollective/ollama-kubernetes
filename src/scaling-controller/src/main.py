@@ -7,6 +7,7 @@ import structlog
 
 from config.config import Config
 from modules.K8sClient import K8sClient
+from modules.NodeProvisioner import NodeProvisioner
 from utils.logging import logger
 from utils.replica_calculations import calculate_desired_pods
 
@@ -26,6 +27,13 @@ async def main():
         # except Exception as error:
         #     logger.error(f"Polling loop failed: {error}")
         # finally:
+
+        if Config.use_node_provisioner:
+            # try:
+            await NodeProvisioner.update()
+            # except Exception as e:
+            # logger.error("Node provisioner update failed", error=str(e))
+
         await asyncio.sleep(Config.update_interval_s)
 
 

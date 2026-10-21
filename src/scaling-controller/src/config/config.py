@@ -32,6 +32,17 @@ class Config:
     """ How long a pod needs to be idle for before scaling down """
     scale_down_idle_default: float = float(os.environ.get("SCALE_DOWN_IDLE", 5.0))
 
+    """ Node scaling """
+    use_node_provisioner: bool = (
+        os.environ.get("USE_NODE_PROVISIONER", "false").lower() == "true"
+    )
+
+    max_nodes: int = int(os.environ.get("MAX_NODES", -1))
+    node_scale_up_command: str | None = os.environ.get("NODE_SCALE_UP_COMMAND")
+    node_scale_down_command: str | None = os.environ.get("NODE_SCALE_DOWN_COMMAND")
+    node_scale_down_idle: float = float(os.environ.get("NODE_SCALE_DOWN_IDLE", "900"))
+    node_join_timeout: float = float(os.environ.get("NODE_JOIN_TIMEOUT", "180"))
+
     @staticproperty
     def scale_down_idle() -> dict[str, float]:
         ret = {}

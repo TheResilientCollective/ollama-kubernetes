@@ -42,3 +42,43 @@ pullmodels:
             name: s3-mount
             mountPath: /s3
     commandAdditions: echo "Installing rsync"; apt update; apt install rsync -y; echo "Copying models to shared S3 mount"; rsync -av --copy-links --no-perms --no-owner --no-group --inplace /models/ /s3/; echo "Copying complete"
+
+customScaler:
+    enabled: true
+    image: scaling-controller:latest
+    env:
+        - name: USE_NODE_PROVISIONER
+          value: true
+        - name: MAX_NODES
+          value: 10
+        - name: NODE_SCALE_UP_COMMAND
+          value: |
+              openstack server create \
+                --flavor g12.large \
+                --image e4230a2a-e196-41dd-a126-1237a2b04ad8 \
+                --network network=resilient_ollama \
+                --key-name k3s-worker \
+                --security-group ollama-k3s-sg \
+                --tag k8s.io/cluster/ollama-k8s=node \
+                --tag tier=$TIER \
+                $NODE_NAME
+        - name: NODE_SCALE_DOWN_COMMAND
+          value: openstack server delete $NODE_NAME
+        - name: NODE_SCALE_DOWN_IDLE
+          value: "900"
+        - name: NODE_JOIN_TIMEOUT
+          value: "180"
+    envFrom:
+        - secretRef:
+              name: openstack-scaler-credentials
+    volumeMounts:
+        - name: openstack-config
+          mountPath: /root/.config/openstack
+          readOnly: true
+    volumes:
+        - name: openstack-config
+          secret:
+              secretName: openstack-scaler-credentials
+              items:
+                  - key: clouds.yaml
+                    path: clouds.yaml

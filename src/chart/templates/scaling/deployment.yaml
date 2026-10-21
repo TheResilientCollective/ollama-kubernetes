@@ -44,6 +44,17 @@ spec:
                       {{- if .Values.customScaler.env }}
                       {{- .Values.customScaler.env | toYaml | nindent 22 }}
                       {{- end }}
+                  {{- if .Values.customScaler.envFrom }}
+                  envFrom:
+                      {{- .Values.customScaler.envFrom | toYaml | nindent 22 }}
+                  {{- end }}
+                  {{- if .Values.customScaler.volumeMounts }}
+                  volumeMounts:
+                      {{- .Values.customScaler.volumeMounts | toYaml | nindent 22 }}
+                  {{- end }}
+            {{- if .Values.customScaler.volumes }}
+            {{- .Values.customScaler.volumes | toYaml | nindent 16 }}
+            {{- end }}
             tolerations:
                 - key: "node-role.kubernetes.io/control-plane"
                   operator: "Equal"
