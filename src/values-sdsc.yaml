@@ -45,7 +45,6 @@ pullmodels:
 
 customScaler:
     enabled: true
-    image: scaling-controller:latest
     env:
         - name: USE_NODE_PROVISIONER
           value: "true"
