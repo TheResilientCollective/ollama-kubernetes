@@ -38,5 +38,4 @@ async def main():
 
 if __name__ == "__main__":
     logger.info("Scaling Controller started")
-    Config.test_config()
     asyncio.run(main())
