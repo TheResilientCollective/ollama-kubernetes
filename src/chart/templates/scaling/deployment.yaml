@@ -53,6 +53,7 @@ spec:
                       {{- .Values.customScaler.volumeMounts | toYaml | nindent 22 }}
                   {{- end }}
             {{- if .Values.customScaler.volumes }}
+            volumes:
             {{- .Values.customScaler.volumes | toYaml | nindent 16 }}
             {{- end }}
             tolerations:
