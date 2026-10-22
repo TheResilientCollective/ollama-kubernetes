@@ -2,9 +2,11 @@
 
 You will need to create an application credential in openstack with:
 **Roles**
-`_member`, `member`, `reader`
+`member`
 
 **Access Rules**
+
+Access rules may not be functional, or use different endpoints, so test if they work first.
 
 ```json
 [{
@@ -35,11 +37,12 @@ You will need to create an application credential in openstack with:
 }]
 ```
 
-You will then download a `clouds.yaml` and a `app-cred-xxxxxxx.sh` file. We won't be using the `clouds.yaml` file, but we will need the app-cred file.
+You will then download a `app-cred-xxxxxxx.sh` file. We won't be using the `clouds.yaml` file, but we will need the app-cred file.
 Create a kubectl secret using the environment variables from the app-cred file.
 
 ```bash
 sed 's/^export //g' app-cred-*.sh | sed 's/^#!.*$//g' > app-cred-clean.sh
+# Note, you may also have to unquote some items before running the following
 kubectl create secret generic openstack-scaler-credentials \
     --namespace ollama \
     --from-env-file=./app-cred-clean.sh
