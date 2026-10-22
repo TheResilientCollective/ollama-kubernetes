@@ -10,4 +10,7 @@ WORKDIR /app
 COPY --from=builder /app/.venv .venv
 COPY src/ src/
 RUN pip install python-openstackclient
+RUN pip install yq
+RUN apt update
+RUN apt install jq -y
 CMD ["/app/.venv/bin/python", "src/main.py"]
