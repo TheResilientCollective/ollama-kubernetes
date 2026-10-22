@@ -74,14 +74,3 @@ customScaler:
     envFrom:
         - secretRef:
               name: openstack-scaler-credentials
-    volumeMounts:
-        - name: openstack-config
-          mountPath: /root/.config/openstack
-          readOnly: true
-    volumes:
-        - name: openstack-config
-          secret:
-              secretName: openstack-scaler-credentials
-              items:
-                  - key: clouds.yaml
-                    path: clouds.yaml
