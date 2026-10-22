@@ -55,10 +55,14 @@ customScaler:
               openstack server create \
                 --flavor g12.large \
                 --image e4230a2a-e196-41dd-a126-1237a2b04ad8 \
-                --network network=resilient_ollama \
-                --key-name k3s-worker \
+                --delete-on-termination \
+                --boot-from-volume 140 \
+                --network resilient_ollama \
+                --key-name ollama-kubernetes-controller \
                 --security-group ollama-k3s-sg \
-                --tag k8s.io/cluster/ollama-k8s=node \
+                --tag ollama-kubernetes \
+                --tag worker-node \
+                --tag gpu \
                 --tag tier=$TIER \
                 $NODE_NAME
         - name: NODE_SCALE_DOWN_COMMAND
