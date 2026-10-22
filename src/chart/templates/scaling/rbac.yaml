@@ -16,7 +16,7 @@ metadata:
     name: ollama-scaler
 rules:
     - apiGroups: [""]
-      resources: ["pods"]
+      resources: ["pods", "nodes"]
       verbs: ["get", "list", "delete"]
     - apiGroups: ["apps"]
       resources: ["deployments/scale"]
