@@ -57,7 +57,7 @@ class Config:
     )
     node_join_timeout: float = float(os.environ.get("NODE_JOIN_TIMEOUT", "180"))
     node_necessary_labels: dict[str, Any] = json.loads(
-        os.environ.get("NODE_NECESSARY_LABELS", "[]")
+        os.environ.get("NODE_NECESSARY_LABELS", "{}")
     )
 
     @staticproperty
