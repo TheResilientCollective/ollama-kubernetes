@@ -1,14 +1,11 @@
+TIER="${TIER:-}"
+
 while sleep 1; do
     clear
-    kubectl get pods -n ollama -o json | jq '[
-    .items[] | 
-        select( .metadata.name | test("ollama-small") ) | 
-        { 
+    kubectl get pods -n ollama -o json | jq --arg tier "$TIER" '[
+        .items[] | select(.metadata.name | test("ollama-" + $tier)) | { 
             pod: .metadata.name, 
-            podReady: (
-                .status.conditions[] | 
-                    select(.type | test("Ready")) | .status 
-            ),
+            podReady: (.status.conditions[]? | select(.type == "Ready") | .status),
             node: .spec.nodeName
         }
     ]'
