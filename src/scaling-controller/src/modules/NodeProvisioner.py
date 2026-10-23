@@ -1,5 +1,6 @@
 import asyncio
 import os
+import random
 import re
 import subprocess
 import time
@@ -123,9 +124,7 @@ class NodeProvisioner:
 
         # FIXME: what is this doing?
         ready = NodeProvisioner.managed_ready_nodes
-        idle_names = {
-            n.metadata.name for n in ready if pods_by_node.get(n.metadata.name, 0) == 0
-        }
+        idle_names = {n.name for n in ready if pods_by_node.get(n.name, 0) == 0}
         NodeProvisioner.__idle_since = {
             name: NodeProvisioner.__idle_since.get(name, now) for name in idle_names
         }
@@ -175,9 +174,42 @@ class NodeProvisioner:
     @staticmethod
     def spin_up_node():
         tier = "medium"  # TODO: determine which tier to use
-        node_name = f"ollama-kubernetes-worker-{tier}-{int(time.time())}"
+        node_name = f"ollama-kubernetes-worker-{tier}-{int(time.time()) + random.randint(0, 1000000000)}"
 
         node = Node(node_name, tier)
         NodeProvisioner.nodes.append(node)
         asyncio.create_task(node.start_server())
         # node.start_polling() # not necessary
+
+    @staticmethod
+    def check_for_existing_nodes():
+        """
+        Looks to see if any nodes already exist and starts tracking them
+        """
+
+        existing_k8s_nodes = getattr(NodeProvisioner.core_api.list_node(), "items", [])
+        logger.info(
+            "Existing nodes", nodes=[n.metadata.name for n in existing_k8s_nodes]
+        )
+        worker_nodes = [
+            node
+            for node in existing_k8s_nodes
+            if re.search(r"ollama-kubernetes-worker-\w+-\d+", node.metadata.name)
+        ]
+
+        for node_data in worker_nodes:
+            name = node_data.metadata.name
+            match = re.search(
+                r"(?<=ollama-kubernetes-worker-)(\w+)(?=-\d+)", node_data.metadata.name
+            )
+            if not match:
+                continue
+
+            tier = match.string
+            node_object = Node(name, tier)
+            NodeProvisioner.nodes.append(node_object)
+            logger.info(
+                "Started tracking existing node",
+                name=node_object.name,
+                tier=node_object.tier,
+            )

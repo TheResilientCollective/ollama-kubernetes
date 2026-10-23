@@ -42,16 +42,18 @@ class Node(Events):
     __tier: str
     core_api: client.CoreV1Api = client.CoreV1Api()
 
-    __start_time: datetime
     __ready_timeout_task: asyncio.Task | None
-    __polling_task: asyncio.Task
+    __polling_task: asyncio.Task | None
 
     def __init__(self, name, tier):
         super().__init__()
         self.__name = name
         self.__tier = tier
+        self.__V1Node = None
+        self.__V1Pods = []
         self.__server_ready = False
         self.__ready_timeout_task = None
+        self.__polling_task = None
         self.on_node_state_changed += self.__clear_ready_timeout  # type: ignore
         self.on_node_state_changed += self.label_node
         self.start_polling()
@@ -150,11 +152,17 @@ class Node(Events):
             )
             # raise Exception(f"Found multiple nodes with the same name")
 
-    def label_node(self):
-        """Adds the gpu label to the node"""
+    def label_node(self, *args, **kwargs):
+        """Adds the gpu and other labels to the node, defined by environment variables"""
+        logger.debug(
+            "Adding labels to node", name=self.name, labels=Config.node_necessary_labels
+        )
         assert self.node
         body = {"metadata": {"labels": Config.node_necessary_labels}}
-        Node.core_api.patch_node(self.name, body)
+        try:
+            response = Node.core_api.patch_node(self.name, body)
+        except Exception as e:
+            logger.error("Failed to label node", name=self.name, error=str(e))
 
     def delete_node(self):
         """Deletes the node and stops kubernetes from tracking it"""
@@ -211,10 +219,11 @@ class Node(Events):
         """Tells cloud provider to create a new server"""
         self.__set_server_ready(False)
         assert Config.node_server_scale_up_command
-        self.__start_time = datetime.now()
         failure, output = await self.__run(Config.node_server_scale_up_command)
 
         self.__ready_timeout_task = asyncio.create_task(self.__handle_ready_timeout())
+
+        # TODO: check if reached quota limit, or if otherwise failed. Destroy self if failed.
 
     async def get_server_status(self):
         """
@@ -248,7 +257,11 @@ class Node(Events):
         self.__set_server_ready(False)
 
         # Stop the polling task
-        if not self.__polling_task.cancelled and not self.__polling_task.cancelling:
+        if (
+            self.__polling_task
+            and not self.__polling_task.cancelled
+            and not self.__polling_task.cancelling
+        ):
             self.__polling_task.cancel()
         # Stop the ready timeout task
         if (
@@ -291,8 +304,17 @@ class Node(Events):
                 tier=self.tier,
                 command=command,
                 stderr=stderr.strip(),
+                exit_code=process.returncode,
             )
             return (1, stderr.strip())
+        logger.debug(
+            "Node command succeeded",
+            name=self.name,
+            tier=self.tier,
+            command=command,
+            stdout=stdout.strip(),
+            exit_code=process.returncode,
+        )
         return (0, stdout.strip())
 
     async def __handle_ready_timeout(self):
@@ -336,6 +358,7 @@ class Node(Events):
         Runs automatically by default and shouldn't need to be called
         unless you delete/stop things and are trying to restart them
         """
+        logger.info("Starting Polling", polling_task=self.__polling_task)
         if self.__polling_task:
             self.__polling_task.cancel()
         self.__polling_task = asyncio.create_task(self.__poll())

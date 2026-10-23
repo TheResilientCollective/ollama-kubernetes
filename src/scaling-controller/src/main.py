@@ -14,6 +14,7 @@ from utils.replica_calculations import calculate_desired_pods
 
 async def main():
     k8s = K8sClient()
+    NodeProvisioner.check_for_existing_nodes()
     while True:
         # try:
         status = (
