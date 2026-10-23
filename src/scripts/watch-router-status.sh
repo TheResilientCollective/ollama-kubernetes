@@ -4,9 +4,13 @@ if [[ -z $TIER ]]; then
     exit 1
 fi
 
+if [[ -z $PORT ]]; then
+    PORT=11434
+fi
+
 while sleep 1; do
     clear
-    curl http://localhost:11439/api/gateway/status | jq \
+    curl "http://localhost:$PORT/api/gateway/status" | jq \
         --arg tier "$TIER" '
         {
             queue: (.queues[$tier].length // 0),
