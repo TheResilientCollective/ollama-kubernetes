@@ -1,3 +1,4 @@
+import asyncio
 import os
 import re
 import subprocess
@@ -9,6 +10,7 @@ from kubernetes.client.models.v1_node import V1Node
 from kubernetes.client.models.v1_pod import V1Pod
 
 from config.config import Config
+from modules.Node import Node
 from utils.logging import logger
 from utils.staticproperty import staticproperty
 
@@ -26,56 +28,54 @@ class NodeProvisioner:
     Nodes are added/removed by running Config.node_scale_up_command / node_scale_down_command.
     """
 
-    nodes: list[V1Node] = []
+    nodes: list[Node] = []
     unscheduled_pods: list[V1Pod] = []
     core_api = client.CoreV1Api()
 
     __idle_since: dict[str, float] = {}
-    __scale_up_requested_at: float | None = None
-    __node_count_at_scale_up: int = 0
 
     @staticproperty
-    def ready_nodes() -> list[V1Node]:
-        return [n for n in NodeProvisioner.nodes if NodeProvisioner.__is_ready(n)]
+    def ready_nodes() -> list[Node]:
+        return [n for n in NodeProvisioner.nodes if n.is_node_ready]
 
     @staticproperty
-    def managed_nodes() -> list[V1Node]:
+    def managed_nodes() -> list[Node]:
         return [
             n
             for n in NodeProvisioner.nodes
-            if re.match(r"ollama-kubernetes-worker-", n.metadata.name)
+            if re.match(r"ollama-kubernetes-worker-", n.name)
         ]
 
     @staticproperty
-    def managed_ready_nodes() -> list[V1Node]:
+    def managed_ready_nodes() -> list[Node]:
         return [
             n
             for n in NodeProvisioner.nodes
-            if (
-                re.match(r"ollama-kubernetes-worker-", n.metadata.name)
-                and NodeProvisioner.__is_ready(n)
-            )
+            if (re.match(r"ollama-kubernetes-worker-", n.name) and n.is_node_ready)
         ]
 
     @staticmethod
     async def update():
-        NodeProvisioner.poll_nodes()
         NodeProvisioner.poll_unscheduled_pods()
+        unready_nodes = [n for n in NodeProvisioner.nodes if not n.is_node_ready]
 
-        if NodeProvisioner.unscheduled_pods:
-            NodeProvisioner.scale_up()
+        necessary_delta = len(NodeProvisioner.unscheduled_pods) - len(unready_nodes)
+
+        if necessary_delta > 0:
+            for i in range(necessary_delta):
+                NodeProvisioner.scale_up()
         else:
             NodeProvisioner.scale_down()
 
     @staticmethod
-    def poll_nodes():
-        NodeProvisioner.nodes = NodeProvisioner.core_api.list_node().items
-
-    @staticmethod
     def poll_unscheduled_pods():
-        pods = NodeProvisioner.core_api.list_namespaced_pod(
-            namespace=Config.namespace, field_selector="status.phase=Pending"
-        ).items
+        pods = getattr(
+            NodeProvisioner.core_api.list_namespaced_pod(
+                namespace=Config.namespace, field_selector="status.phase=Pending"
+            ),
+            "items",
+            [],
+        )
         NodeProvisioner.unscheduled_pods = [
             pod
             for pod in pods
@@ -93,45 +93,35 @@ class NodeProvisioner:
 
     @staticmethod
     def scale_up():
-        if not Config.node_server_scale_up_command:
-            return
         node_count = len(NodeProvisioner.nodes)
         if Config.max_nodes >= 0 and node_count >= Config.max_nodes:
             logger.warn("Unschedulable pods but at max nodes", max_nodes=node_count)
             return
 
-        # Don't stack requests while a previously requested node is still joining
-        requested_at = NodeProvisioner.__scale_up_requested_at
-        if (
-            requested_at is not None
-            and node_count <= NodeProvisioner.__node_count_at_scale_up
-            and time.time() - requested_at < Config.node_join_timeout
-        ):
-            return
-
         logger.info(
             "Scaling up nodes", unscheduled_pods=len(NodeProvisioner.unscheduled_pods)
         )
-        tier = Config.tiers[0]  # TODO: determine which tier to use
-        node_name = f"ollama-kubernetes-worker-{tier}-{int(time.time())}"
-        if NodeProvisioner.__run(
-            Config.node_server_scale_up_command, {"NODE_NAME": node_name, "TIER": tier}
-        ):
-            NodeProvisioner.__scale_up_requested_at = time.time()
-            NodeProvisioner.__node_count_at_scale_up = node_count
+        NodeProvisioner.spin_up_node()
 
     @staticmethod
     def scale_down():
         if not Config.node_server_scale_down_command:
             return
         now = time.time()
-        pods_by_node: dict[str, int] = {}
-        for pod in NodeProvisioner.core_api.list_pod_for_all_namespaces().items:
+
+        # get how long each pod has been idle for
+        pods_by_node: dict[str, int] = {}  # FIXME: unclear naming of variable
+        all_pods = getattr(
+            NodeProvisioner.core_api.list_namespaced_pod(Config.namespace), "items", []
+        )
+        # Filter out daemon sets
+        for pod in all_pods:
             if NodeProvisioner.__is_daemonset_pod(pod):
                 continue
             node_name = pod.spec.node_name
             pods_by_node[node_name] = pods_by_node.get(node_name, 0) + 1
 
+        # FIXME: what is this doing?
         ready = NodeProvisioner.managed_ready_nodes
         idle_names = {
             n.metadata.name for n in ready if pods_by_node.get(n.metadata.name, 0) == 0
@@ -146,22 +136,23 @@ class NodeProvisioner:
         for name, since in NodeProvisioner.__idle_since.items():
             if now - since >= Config.node_server_scale_down_idle:
                 logger.info("Scaling down node", node=name)
-                if NodeProvisioner.__run(
-                    Config.node_server_scale_down_command, {"NODE_NAME": name}
-                ):
-                    del NodeProvisioner.__idle_since[name]
+
+                node_to_delete = next(
+                    (node for node in NodeProvisioner.nodes if node.name == name), None
+                )
+                if not node_to_delete:
+                    continue
+
+                del NodeProvisioner.__idle_since[name]
+                NodeProvisioner.nodes.remove(node_to_delete)
+                node_to_delete.delete()
                 return
 
     @staticmethod
-    def __is_ready(node: V1Node) -> bool:
-        return any(
-            c.type == "Ready" and c.status == "True"
-            for c in (node.status.conditions or [])
-        )
-
-    @staticmethod
     def __is_daemonset_pod(pod: V1Pod) -> bool:
-        return any(o.kind == "DaemonSet" for o in (pod.metadata.owner_references or []))
+        return any(
+            o.kind == "DaemonSet" for o in getattr(pod.metadata, "owner_references", [])
+        )
 
     @staticmethod
     def __run(command: str, extra_env: dict[str, str] | None = None) -> bool:
@@ -178,3 +169,15 @@ class NodeProvisioner:
             )
             return False
         return True
+
+    """ New Node Module """
+
+    @staticmethod
+    def spin_up_node():
+        tier = "medium"  # TODO: determine which tier to use
+        node_name = f"ollama-kubernetes-worker-{tier}-{int(time.time())}"
+
+        node = Node(node_name, tier)
+        NodeProvisioner.nodes.append(node)
+        asyncio.create_task(node.start_server())
+        # node.start_polling() # not necessary

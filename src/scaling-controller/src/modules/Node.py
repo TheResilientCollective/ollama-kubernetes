@@ -43,21 +43,18 @@ class Node(Events):
     core_api: client.CoreV1Api = client.CoreV1Api()
 
     __start_time: datetime
-    __ready_timeout_task: asyncio.Task | None = None
+    __ready_timeout_task: asyncio.Task | None
+    __polling_task: asyncio.Task
 
     def __init__(self, name, tier):
         super().__init__()
         self.__name = name
         self.__tier = tier
         self.__server_ready = False
-        self.on_node_state_changed += lambda ready: (
-            self.__ready_timeout_task.cancel()
-            if self.__ready_timeout_task and ready
-            else logger.info("Node not ready", name=self.name)
-        )
-        self.on_node_state_changed += lambda ready: (
-            asyncio.ensure_future(self.label_node()) if ready else None
-        )
+        self.__ready_timeout_task = None
+        self.on_node_state_changed += self.__clear_ready_timeout  # type: ignore
+        self.on_node_state_changed += self.label_node
+        self.start_polling()
 
     """ ACCESSORS """
 
@@ -153,14 +150,60 @@ class Node(Events):
             )
             # raise Exception(f"Found multiple nodes with the same name")
 
-    async def label_node(self):
+    def label_node(self):
         """Adds the gpu label to the node"""
+        assert self.node
         body = {"metadata": {"labels": Config.node_necessary_labels}}
         Node.core_api.patch_node(self.name, body)
 
-    async def delete_node(self):
+    def delete_node(self):
         """Deletes the node and stops kubernetes from tracking it"""
-        pass
+        logger.info("Deleting node", name=self.name)
+        # drain node
+        try:
+            body = {"spec": {"unschedulable": True}}
+            Node.core_api.patch_node(self.name, body)
+
+            pods = getattr(
+                Node.core_api.list_namespaced_pod(
+                    Config.namespace, field_selector=f"spec.nodeName={self.name}"
+                ),
+                "items",
+                [],
+            )
+            for pod in pods:
+                if pod.metadata.owner_references:
+                    # skip daemonsets and controllers
+                    if any(
+                        o.kind in ["DaemonSet", "ReplicaSet", "StatefulSet", "Job"]
+                        for o in pod.metadata.owner_references
+                    ):
+                        continue
+
+                    try:
+                        Node.core_api.delete_namespaced_pod(
+                            pod.metadata.name, Config.namespace
+                        )
+                    except:
+                        pass
+        except Exception as e:
+            logger.error("Failed to drain node", error=str(e))
+
+        # delete the node
+        try:
+            Node.core_api.delete_node(self.name)
+        except:
+            pass
+        self.node = None
+
+        # Stop the ready timeout task
+        if (
+            self.__ready_timeout_task
+            and not self.__ready_timeout_task.cancelled
+            and not self.__ready_timeout_task.cancelling
+        ):
+            self.__ready_timeout_task.cancel()
+            self.__ready_timeout_task = None
 
     """ SERVER """
 
@@ -196,10 +239,25 @@ class Node(Events):
 
     async def delete_server(self):
         """Tells cloud provider to delete the server"""
-        logger.info("Deleting node", node=self.name)
+        if self.node:
+            self.delete_node()
+
+        logger.info("Deleting server", node=self.name)
         assert Config.node_server_scale_down_command
         failure, output = await self.__run(Config.node_server_scale_down_command)
-        await self.get_server_status()
+        self.__set_server_ready(False)
+
+        # Stop the polling task
+        if not self.__polling_task.cancelled and not self.__polling_task.cancelling:
+            self.__polling_task.cancel()
+        # Stop the ready timeout task
+        if (
+            self.__ready_timeout_task
+            and not self.__ready_timeout_task.cancelled
+            and not self.__ready_timeout_task.cancelling
+        ):
+            self.__ready_timeout_task.cancel()
+            self.__ready_timeout_task = None
 
     """ HELPER """
 
@@ -257,3 +315,30 @@ class Node(Events):
 
         except asyncio.CancelledError:
             pass
+
+    def __clear_ready_timeout(self, ready: bool):
+        if self.__ready_timeout_task and ready:
+            self.__ready_timeout_task.cancel()
+            self.__ready_timeout_task = None
+
+    async def __poll(self):
+        try:
+            while True:
+                await self.get_server_status()
+                self.get_node_status()
+                await asyncio.sleep(5)
+        except asyncio.CancelledError:
+            pass
+
+    def start_polling(self):
+        """
+        Starts regularly polling server and node for status updates in the background.
+        Runs automatically by default and shouldn't need to be called
+        unless you delete/stop things and are trying to restart them
+        """
+        if self.__polling_task:
+            self.__polling_task.cancel()
+        self.__polling_task = asyncio.create_task(self.__poll())
+
+    def delete(self):
+        asyncio.create_task(self.delete_server())
