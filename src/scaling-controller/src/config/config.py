@@ -1,6 +1,6 @@
 import json
 import os
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import requests
 
@@ -40,10 +40,25 @@ class Config:
     )
 
     max_nodes: int = int(os.environ.get("MAX_NODES", -1))
-    node_scale_up_command: str | None = os.environ.get("NODE_SCALE_UP_COMMAND")
-    node_scale_down_command: str | None = os.environ.get("NODE_SCALE_DOWN_COMMAND")
-    node_scale_down_idle: float = float(os.environ.get("NODE_SCALE_DOWN_IDLE", "900"))
+    node_server_scale_up_command: str | None = os.environ.get(
+        "NODE_SERVER_SCALE_UP_COMMAND"
+    )
+    node_server_scale_down_command: str | None = os.environ.get(
+        "NODE_SERVER_SCALE_DOWN_COMMAND"
+    )
+    node_server_status_command: str | None = os.environ.get(
+        "NODE_SERVER_STATUS_COMMAND"
+    )
+    node_server_status_command_ready: str | None = os.environ.get(
+        "NODE_SERVER_STATUS_COMMAND_READY"
+    )
+    node_server_scale_down_idle: float = float(
+        os.environ.get("NODE_SERVER_SCALE_DOWN_IDLE", "900")
+    )
     node_join_timeout: float = float(os.environ.get("NODE_JOIN_TIMEOUT", "180"))
+    node_necessary_labels: dict[str, Any] = json.loads(
+        os.environ.get("NODE_NECESSARY_LABELS", "[]")
+    )
 
     @staticproperty
     def scale_down_idle() -> dict[str, float]:

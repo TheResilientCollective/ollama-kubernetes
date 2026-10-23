@@ -50,7 +50,7 @@ customScaler:
           value: "true"
         - name: MAX_NODES
           value: "10"
-        - name: NODE_SCALE_UP_COMMAND
+        - name: NODE_SERVER_SCALE_UP_COMMAND
           value: |
               openstack server create \
                 --flavor g12.large \
@@ -65,12 +65,20 @@ customScaler:
                 --tag gpu \
                 --tag tier=$TIER \
                 $NODE_NAME
-        - name: NODE_SCALE_DOWN_COMMAND
+        - name: NODE_SERVER_SCALE_DOWN_COMMAND
           value: openstack server delete $NODE_NAME
-        - name: NODE_SCALE_DOWN_IDLE
+        - name: NODE_SERVER_STATUS_COMMAND
+          value: |
+              openstack server show $NODE_NAME -f json | \
+              jq ".status" -r
+        - name: NODE_SERVER_STATUS_COMMAND_READY
+          value: ACTIVE
+        - name: NODE_SERVER_SCALE_DOWN_IDLE
           value: "900"
         - name: NODE_JOIN_TIMEOUT
           value: "180"
+        - name: NODE_NECESSARY_LABELS
+          value: { "nvidia.com/gpu": true }
     envFrom:
         - secretRef:
               name: openstack-scaler-credentials

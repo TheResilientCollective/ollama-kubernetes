@@ -93,7 +93,7 @@ class NodeProvisioner:
 
     @staticmethod
     def scale_up():
-        if not Config.node_scale_up_command:
+        if not Config.node_server_scale_up_command:
             return
         node_count = len(NodeProvisioner.nodes)
         if Config.max_nodes >= 0 and node_count >= Config.max_nodes:
@@ -115,14 +115,14 @@ class NodeProvisioner:
         tier = Config.tiers[0]  # TODO: determine which tier to use
         node_name = f"ollama-kubernetes-worker-{tier}-{int(time.time())}"
         if NodeProvisioner.__run(
-            Config.node_scale_up_command, {"NODE_NAME": node_name, "TIER": tier}
+            Config.node_server_scale_up_command, {"NODE_NAME": node_name, "TIER": tier}
         ):
             NodeProvisioner.__scale_up_requested_at = time.time()
             NodeProvisioner.__node_count_at_scale_up = node_count
 
     @staticmethod
     def scale_down():
-        if not Config.node_scale_down_command:
+        if not Config.node_server_scale_down_command:
             return
         now = time.time()
         pods_by_node: dict[str, int] = {}
@@ -144,10 +144,10 @@ class NodeProvisioner:
         if len(ready) <= 1:
             return
         for name, since in NodeProvisioner.__idle_since.items():
-            if now - since >= Config.node_scale_down_idle:
+            if now - since >= Config.node_server_scale_down_idle:
                 logger.info("Scaling down node", node=name)
                 if NodeProvisioner.__run(
-                    Config.node_scale_down_command, {"NODE_NAME": name}
+                    Config.node_server_scale_down_command, {"NODE_NAME": name}
                 ):
                     del NodeProvisioner.__idle_since[name]
                 return
