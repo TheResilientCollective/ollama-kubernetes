@@ -78,7 +78,7 @@ customScaler:
         - name: NODE_JOIN_TIMEOUT
           value: "180"
         - name: NODE_NECESSARY_LABELS
-          value: '{ "nvidia.com/gpu": true }'
+          value: '{ "nvidia.com/gpu": "true" }'
     envFrom:
         - secretRef:
               name: openstack-scaler-credentials
