@@ -205,7 +205,7 @@ class NodeProvisioner:
             if not match:
                 continue
 
-            tier = match.string
+            tier = match.group(0)
             node_object = Node(name, tier)
             NodeProvisioner.nodes.append(node_object)
             logger.info(

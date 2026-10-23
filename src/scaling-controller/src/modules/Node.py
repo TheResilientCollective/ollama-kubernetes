@@ -92,15 +92,6 @@ class Node(Events):
         if not value or not value.status:
             new_ready = False
         else:
-            logger.info(
-                "Updating node status",
-                name=self.name,
-                status=[
-                    cond for cond in value.status.conditions if cond.type == "Ready"
-                ],
-                condition_types=[cond.type for cond in value.status.conditions],
-            )
-
             ready_conditions = [
                 cond for cond in value.status.conditions if cond.type == "Ready"
             ]
