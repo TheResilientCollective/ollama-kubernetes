@@ -31,19 +31,24 @@ except k8s_config.ConfigException:
 
 
 class Node(Events):
+    core_api: client.CoreV1Api = client.CoreV1Api()
+
     __events__ = (
         "on_node_state_changed",
         "on_server_state_changed",
+        "on_error",
     )
     __server_ready: bool
+    __server_start_failed: bool | None
+    __server_deleting: bool
     __V1Node: V1Node | None
     __V1Pods: list[V1Pod]
     __name: str
     __tier: str
-    core_api: client.CoreV1Api = client.CoreV1Api()
 
     __ready_timeout_task: asyncio.Task | None
     __polling_task: asyncio.Task | None
+    __start_task: asyncio.Task | None
 
     def __init__(self, name, tier):
         super().__init__()
@@ -52,10 +57,14 @@ class Node(Events):
         self.__V1Node = None
         self.__V1Pods = []
         self.__server_ready = False
+        self.__server_start_failed = None
+        self.__server_deleting = False
+        self.__start_task = None
         self.__ready_timeout_task = None
         self.__polling_task = None
         self.on_node_state_changed += self.__clear_ready_timeout  # type: ignore
         self.on_node_state_changed += self.label_node
+        self.on_error += self.delete
         self.start_polling()
 
     """ ACCESSORS """
@@ -108,6 +117,8 @@ class Node(Events):
     def is_node_ready(self) -> bool:
         if not self.node or not self.node.status:
             return False
+        if self.__server_start_failed or self.__server_deleting:
+            return False
 
         ready_conditions = [
             cond for cond in self.node.status.conditions if cond.type == "Ready"
@@ -116,6 +127,14 @@ class Node(Events):
             ready_conditions[0].status == "True" if len(ready_conditions) > 0 else False
         )
         return ready
+
+    @property
+    def server_start_failed(self) -> bool | None:
+        return self.__server_start_failed
+
+    @property
+    def server_deleting(self) -> bool:
+        return self.__server_deleting
 
     def __set_server_ready(self, value: bool):
         original = self.__server_ready
@@ -141,19 +160,21 @@ class Node(Events):
             logger.error(
                 "Found multiple nodes with the same name", name=self.name, nodes=matches
             )
-            # raise Exception(f"Found multiple nodes with the same name")
+            self.on_error("Found multiple nodes with the same name")
 
     def label_node(self, *args, **kwargs):
         """Adds the gpu and other labels to the node, defined by environment variables"""
+        if not self.node:
+            return
         logger.debug(
             "Adding labels to node", name=self.name, labels=Config.node_necessary_labels
         )
-        assert self.node
         body = {"metadata": {"labels": Config.node_necessary_labels}}
         try:
             response = Node.core_api.patch_node(self.name, body)
         except Exception as e:
             logger.error("Failed to label node", name=self.name, error=str(e))
+            self.on_error("Failed to label node")
 
     def delete_node(self):
         """Deletes the node and stops kubernetes from tracking it"""
@@ -206,13 +227,30 @@ class Node(Events):
 
     """ SERVER """
 
-    async def start_server(self):
+    def start_server(self):
         """Tells cloud provider to create a new server"""
+        self.start_task = asyncio.create_task(self.__start_server())
+
+    async def __start_server(self):
+        # Reset state variables
         self.__set_server_ready(False)
+        self.__server_deleting = False
+        self.__server_start_failed = None
+        if self.__ready_timeout_task:
+            self.__clear_ready_timeout(False, force=True)
+
+        # Run startup command
         assert Config.node_server_scale_up_command
         failure, output = await self.__run(Config.node_server_scale_up_command)
 
-        self.__ready_timeout_task = asyncio.create_task(self.__handle_ready_timeout())
+        if failure:
+            self.__server_start_failed = True
+            self.on_error("Server failed to start")
+        else:
+            self.__server_start_failed = False
+            self.__ready_timeout_task = asyncio.create_task(
+                self.__handle_ready_timeout()
+            )
 
         # TODO: check if reached quota limit, or if otherwise failed. Destroy self if failed.
 
@@ -239,6 +277,9 @@ class Node(Events):
 
     async def delete_server(self):
         """Tells cloud provider to delete the server"""
+        if self.__server_deleting:
+            return
+        self.__server_deleting = True
         if self.node:
             self.delete_node()
 
@@ -320,17 +361,14 @@ class Node(Events):
                     server_ready=self.__server_ready,
                     node_ready=self.is_node_ready,
                 )
-                # Cleanup
-                try:
-                    await self.delete_server()
-                except Exception as e:
-                    logger.error("Failed to cleanup server", error=str(e))
+                self.__server_start_failed = True
+                self.on_error("Node initialization timed out")
 
         except asyncio.CancelledError:
             pass
 
-    def __clear_ready_timeout(self, ready: bool):
-        if self.__ready_timeout_task and ready:
+    def __clear_ready_timeout(self, ready: bool, force: bool = False):
+        if self.__ready_timeout_task and (ready or force):
             self.__ready_timeout_task.cancel()
             self.__ready_timeout_task = None
 
@@ -354,5 +392,7 @@ class Node(Events):
             self.__polling_task.cancel()
         self.__polling_task = asyncio.create_task(self.__poll())
 
-    def delete(self):
+    def delete(self, *args, **kwargs):
+        if self.__server_deleting:
+            return
         asyncio.create_task(self.delete_server())

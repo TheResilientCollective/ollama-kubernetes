@@ -34,6 +34,8 @@ class NodeProvisioner:
     core_api = client.CoreV1Api()
 
     __idle_since: dict[str, float] = {}
+    __server_creation_failed_attempts: int = 0
+    __server_creation_last_attempt: float | None = None
 
     @staticproperty
     def ready_nodes() -> list[Node]:
@@ -58,7 +60,13 @@ class NodeProvisioner:
     @staticmethod
     async def update():
         NodeProvisioner.poll_unscheduled_pods()
-        unready_nodes = [n for n in NodeProvisioner.nodes if not n.is_node_ready]
+        unready_nodes = [
+            n
+            for n in NodeProvisioner.nodes
+            if not n.is_node_ready
+            and not n.server_start_failed
+            and not n.server_deleting
+        ]
 
         necessary_delta = len(NodeProvisioner.unscheduled_pods) - len(unready_nodes)
 
@@ -171,15 +179,47 @@ class NodeProvisioner:
 
     """ New Node Module """
 
+    @staticproperty
+    def __server_creation_is_cooling_down() -> bool:
+        if not NodeProvisioner.__server_creation_last_attempt:
+            return False
+
+        timeout = NodeProvisioner.__server_creation_failed_attempts**3
+        cooldown_until = NodeProvisioner.__server_creation_last_attempt + timeout
+        still_cooling_down = time.time() < cooldown_until
+
+        if not still_cooling_down:
+            NodeProvisioner.__server_creation_failed_attempts = 0
+            NodeProvisioner.__server_creation_last_attempt = None
+
+        return still_cooling_down
+
     @staticmethod
     def spin_up_node():
+        # Check cooldown
+        if NodeProvisioner.__server_creation_is_cooling_down:
+            return
+
         tier = "medium"  # TODO: determine which tier to use
         node_name = f"ollama-kubernetes-worker-{tier}-{int(time.time()) + random.randint(0, 1000000000)}"
 
         node = Node(node_name, tier)
         NodeProvisioner.nodes.append(node)
-        asyncio.create_task(node.start_server())
+        node.on_error += lambda output: NodeProvisioner.__handle_node_error(
+            node, output
+        )
+        node.start_server()
         # node.start_polling() # not necessary
+
+    @staticmethod
+    def __handle_node_error(node: Node, reason: str):
+        if node not in NodeProvisioner.nodes:
+            return
+
+        NodeProvisioner.nodes.remove(node)
+        if "Server failed to start" in reason or "timed out" in reason:
+            NodeProvisioner.__server_creation_last_attempt = time.time()
+            NodeProvisioner.__server_creation_failed_attempts += 1
 
     @staticmethod
     def check_for_existing_nodes():
@@ -208,6 +248,9 @@ class NodeProvisioner:
             tier = match.group(0)
             node_object = Node(name, tier)
             NodeProvisioner.nodes.append(node_object)
+            node_object.on_error += lambda message: NodeProvisioner.__handle_node_error(
+                node_object, message
+            )
             logger.info(
                 "Started tracking existing node",
                 name=node_object.name,
