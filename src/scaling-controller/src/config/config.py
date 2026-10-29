@@ -60,6 +60,17 @@ class Config:
         os.environ.get("NODE_NECESSARY_LABELS", "{}")
     )
 
+    """ Pod provisioner """
+    pod_provisioner_interval_s: float = float(
+        os.environ.get("POD_PROVISIONER_INTERVAL_S", "2")
+    )
+    pod_provisioner_request_timeout_s: float = float(
+        os.environ.get("POD_PROVISIONER_REQUEST_TIMEOUT_S", "5")
+    )
+    pod_provisioner_stale_after_interval_s: float = float(
+        os.environ.get("POD_PROVISIONER_STALE_AFTER_INTERVAL_S", "3")
+    )
+
     @staticproperty
     def scale_down_idle() -> dict[str, float]:
         ret = {}
